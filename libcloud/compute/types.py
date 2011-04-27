@@ -54,6 +54,7 @@ class Provider(object):
     @cvar NIMBUS: Nimbus
     @cvar BLUEBOX: Bluebox
     @cvar OPSOURCE: Opsource Cloud
+    @cvar OPENSTACK: OpenStack Cloud
     """
     DUMMY = 0
     EC2 = 1  # deprecated name

@@ -24,10 +24,9 @@
 
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
+import pprint
 
-from pretty import pprint
-
-def main(argv):
+def main():
     """Main OpenStack Demo
 
     When invoked from the command line, it will connect using NOVA_API_KEY
@@ -58,12 +57,7 @@ def main(argv):
         print ">> Loading nodes..."
         nodes = open_stack.list_nodes()
         pprint(nodes)
-    except NameError, e:
-        print ">> Fatal Error: %s" % e
-        print "   (Hint: modify secrets.py.dist)"
-        return 1
-    except Exception, e:
-        print ">> Fatal error: %s" % e
+    except Exception:
         return 1
 
     print ">> Loading images... (showing up to 10)"
@@ -81,7 +75,6 @@ def main(argv):
     return 0
 
 if __name__ == '__main__':
-    import sys
-    sys.exit(main(sys.argv))
+    main()
 
   

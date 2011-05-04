@@ -86,7 +86,7 @@ class OpenStackConnection(ConnectionUserAndKey):
             params = {}
         action = self.server_url + action
         if method in ("POST", "PUT"):
-            headers = {'Content-Type': 'application/json; charset=UTF-8'}#TODO parametrise Content-Type
+            headers = {'Content-Type': 'application/json'}#TODO parametrise Content-Type
             #TODO check what about token cache-expire in OS
         return super(OpenStackConnection, self).request(
             action=action,
@@ -96,7 +96,8 @@ class OpenStackConnection(ConnectionUserAndKey):
 
     def add_default_headers(self, headers):
         headers['X-Auth-Token'] = self.auth_token
-        #TODO add parametrised accept headers['Accept'] = 'application/xml'
+        #TODO add parametrised accept
+        headers['Accept'] = 'application/json'
         return headers
 
     def _auth(self):
@@ -166,10 +167,10 @@ class OpenStackNodeDriver(NodeDriver):
         return [NodeLocation(id=0, name='OpenStack is private cloud', country='NoCountry', driver=self)]
 
     def list_sizes(self, location=None):
-        flavors_dict = self.connection.request('/flavors/detail').object
+        flavors_dict = self.connection.request('flavors/detail').object
         try:
             flavors = flavors_dict['flavors']
-            values = flavors['values']
+            values = flavors
         except KeyError:
             raise MalformedResponseError(value='no flavors-values clause', body=flavors_dict, driver=self)
         return [ self._to_size(value) for value in values ]
@@ -188,10 +189,10 @@ class OpenStackNodeDriver(NodeDriver):
         return s
     
     def list_images(self, location=None):
-        images_dict = self.connection.request('/images/detail').object
+        images_dict = self.connection.request('images/detail').object
         try:
             images = images_dict['images']
-            values = images['values']
+            values = images
         except KeyError:
             raise MalformedResponseError(value='no images-values clause', body=images_dict, driver=self)
         return [ self._to_image(value) for value in values if value.get('status') == 'ACTIVE' ]
@@ -207,7 +208,7 @@ class OpenStackNodeDriver(NodeDriver):
         servers_dict = self.connection.request('/servers/detail').object
         try:
             servers = servers_dict['servers']
-            values = servers['values']
+            values = servers
         except KeyError:
             raise MalformedResponseError(value='in list_nodes: no servers-values clause', body=servers_dict, driver=self)
         return [ self._to_node(value) for value in values ]
@@ -240,7 +241,7 @@ class OpenStackNodeDriver(NodeDriver):
             request['server']['personality']=ex_personality
 
         data=json.dumps(request)
-        resp = self.connection.request("/servers", method='POST', data=data)
+        resp = self.connection.request("servers", method='POST', data=data)
         try:
             server_dict = resp.object['server']
         except KeyError:
@@ -249,7 +250,7 @@ class OpenStackNodeDriver(NodeDriver):
 
     def _to_node(self, server_dict):
         """ Here we expect a dictionary which is under the clause server or servers in /servers or /servers/detail """
-        ips = OpenStackIps(server_dict['addresses']['values'])
+        ips = OpenStackIps(server_dict['addresses'])
 
         n = Node(id=server_dict.get('id'),
                  name=server_dict.get('name'),
@@ -295,7 +296,7 @@ class OpenStackNodeDriver(NodeDriver):
         return resp
 
     def ex_rebuild(self, node_id, image_id): #TODO support real data
-        resp = self.connection.request("/servers/%s/action" % node_id,
+        resp = self.connection.request("servers/%s/action" % node_id,
                                        method='POST',
                                        data='')
         return resp.status == 202
@@ -318,11 +319,8 @@ class OpenStackIps(object):
     public_ipv6 = []
     private_ipv6 = []
     def __init__(self, ip_list):
-        for ip in ip_list:
-            if ip['id'] == 'public':
-                self._separate_by_protocol(ip['values'], self.public_ipv4, self.public_ipv6)
-            if ip['id'] == 'private':
-                self._separate_by_protocol(ip['values'], self.private_ipv4, self.private_ipv6)
+        self._separate_by_protocol(ip_list['public'], self.public_ipv4, self.public_ipv6)
+        self._separate_by_protocol(ip_list['private'], self.private_ipv4, self.private_ipv6)
 
     def _separate_by_protocol(self, input_list, out_list_v4, out_list_v6):
         """ convert IP dictionary to tuple of the structure """
@@ -331,4 +329,3 @@ class OpenStackIps(object):
                 out_list_v4.append(ip['addr'])
             if ip['version'] == 6:
                 out_list_v6.append(ip['addr'])
-

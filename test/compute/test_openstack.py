@@ -40,7 +40,7 @@ class OpenStackMockHttp(MockHttp):
         accept = headers.get('accept')
         ext = (not accept or re.search('/json$',accept)) and '.json' or '.xml'
 
-        return method.lower()+action+ext
+        return 'v1.1_' + method.lower()+action+ext
 
     def _v1_1(self, method, url, body, headers):
         headers = {'x-server-management-url': 'http://test.url.faked/v1.1',
@@ -62,6 +62,10 @@ class OpenStackMockHttp(MockHttp):
         return httplib.OK, body, {}, httplib.responses[httplib.OK]
 
     def _v1_1_servers(self, method, url, body, headers):
+        body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
+
+    def _v1_1_servers_1234_detail(self, method, url, body, headers):
         body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
         return httplib.OK, body, {}, httplib.responses[httplib.OK]
 

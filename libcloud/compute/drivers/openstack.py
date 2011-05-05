@@ -127,7 +127,8 @@ class OpenStackNodeDriver(NodeDriver):
     connectionCls = OpenStackConnection
     name = 'OpenStack'
     type = Provider.OPENSTACK
-    features = {}
+
+    features = {"create_node": ["generates_password"]}
 
     NODE_STATE_MAP = { 'BUILD': NodeState.PENDING,
                        'REBUILD': NodeState.PENDING,

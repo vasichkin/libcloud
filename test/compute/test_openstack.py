@@ -25,13 +25,13 @@ from test.compute import TestCaseMixin
 from test.file_fixtures import ComputeFileFixtures
 
 class OpenStackTests(unittest.TestCase, TestCaseMixin):
-
     def setUp(self):
         OpenStackNodeDriver.connectionCls.conn_classes = (OpenStackMockHttp, OpenStackMockHttp)
         OpenStackMockHttp.type = None
-        self.driver = OpenStackNodeDriver(user_name='TestUser', api_key='TestKey', url='http://test.url.faked.auth:3333/v1.1/')
+        self.driver = OpenStackNodeDriver(user_name='TestUser', api_key='TestKey',
+                                          url='http://test.url.faked.auth:3333/v1.1/')
         self.driver.list_nodes() # to authorize
-        
+
     def test_auth(self):
         OpenStackMockHttp.type = 'UNAUTHORIZED'
         try:
@@ -52,7 +52,7 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         else:
             self.fail('test should have thrown')
 
-#TODO http://docs.openstack.org/bexar/openstack-compute/developer/content/ch03s07.html
+        #TODO http://docs.openstack.org/bexar/openstack-compute/developer/content/ch03s07.html
 
     def test_list_nodes(self):
         OpenStackMockHttp.type = 'EMPTY'
@@ -80,12 +80,13 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertEqual(len(ret), 2)
         size = ret[0]
         self.assertEqual(size.name, '256 MB Server')
-#        self.assertTrue(isinstance(size.price, float))
+
+    #        self.assertTrue(isinstance(size.price, float))
 
     def test_list_images(self):
         ret = self.driver.list_images()
         self.assertEqual(len(ret), 3)
-        
+
         self.assertEqual(ret[10].extra['serverRef'], None)
         self.assertEqual(ret[11].extra['serverRef'], '91221')
 
@@ -100,8 +101,8 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         OpenStackMockHttp.type = 'METADATA'
         image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver)
         size = NodeSize(1, '256 slice', None, None, None, None, driver=self.driver)
-        metadata = { 'a': 'b', 'c': 'd' }
-        files = { '/file1': 'content1', '/file2': 'content2' }
+        metadata = {'a': 'b', 'c': 'd'}
+        files = {'/file1': 'content1', '/file2': 'content2'}
         node = self.driver.create_node(name='racktest', image=image, size=size, metadata=metadata, files=files)
         self.assertEqual(node.name, 'racktest')
         self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')
@@ -126,7 +127,7 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
 
     def test_ex_save_image(self):
         node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
-                driver=self.driver)
+                    driver=self.driver)
         image = self.driver.ex_save_image(node, "imgtest")
         self.assertEqual(image.name, "imgtest")
         self.assertEqual(image.id, "12345")
@@ -138,18 +139,18 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertTrue('67.23.10.132' in ret.public_addresses)
         self.assertEquals(1, len(ret.private_addresses))
         self.assertTrue('10.176.42.16' in ret.private_addresses)
-#
-#    def test_ex_list_ip_groups(self):
-#        ret = self.driver.ex_list_ip_groups()
-#        self.assertEquals(2, len(ret))
-#        self.assertEquals('1234', ret[0].id)
-#        self.assertEquals('Shared IP Group 1', ret[0].name)
-#        self.assertEquals('5678', ret[1].id)
-#        self.assertEquals('Shared IP Group 2', ret[1].name)
-#        self.assertTrue(ret[0].servers is None)
-#
-#    def test_ex_list_ip_groups_detail(self):
-#        ret = self.driver.ex_list_ip_groups(details=True)
+        #
+        #    def test_ex_list_ip_groups(self):
+        #        ret = self.driver.ex_list_ip_groups()
+        #        self.assertEquals(2, len(ret))
+        #        self.assertEquals('1234', ret[0].id)
+        #        self.assertEquals('Shared IP Group 1', ret[0].name)
+        #        self.assertEquals('5678', ret[1].id)
+        #        self.assertEquals('Shared IP Group 2', ret[1].name)
+        #        self.assertTrue(ret[0].servers is None)
+        #
+        #    def test_ex_list_ip_groups_detail(self):
+        #        ret = self.driver.ex_list_ip_groups(details=True)
 
         self.assertEquals(2, len(ret))
 
@@ -168,7 +169,6 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
 
 
 class OpenStackMockHttp(MockHttp):
-
     fixtures = ComputeFileFixtures('openstack')
 
     def _v1_1_UNAUTHORIZED(self, method, url, body, headers):
@@ -176,9 +176,9 @@ class OpenStackMockHttp(MockHttp):
 
     def _v1_1_UNAUTHORIZED_MISSING_KEY(self, method, url, body, headers):
         headers = {'x-auth-token': 'FE011C19-CF86-4F87-BE5D-9229145D7A06'}
-#                  'x-server-management-url': 'https://servers.api.rackspacecloud.com/v1.1',
+        #                  'x-server-management-url': 'https://servers.api.rackspacecloud.com/v1.1',
 
-#                   'x-cdn-management-url': 'https://cdn.clouddrive.com/v1/MossoCloudFS_FE011C19-CF86-4F87-BE5D-9229145D7A06'}
+        #                   'x-cdn-management-url': 'https://cdn.clouddrive.com/v1/MossoCloudFS_FE011C19-CF86-4F87-BE5D-9229145D7A06'}
         return (httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT])
 
     def _v1_1_servers_detail_EMPTY(self, method, url, body, headers):
@@ -186,32 +186,32 @@ class OpenStackMockHttp(MockHttp):
         return (httplib.OK, body, {}, httplib.responses[httplib.OK])
 
     def _v1_1_servers_72258_action(self, method, url, body, headers):
-        if method != "POST" or string.find(body,'reboot')==-1:
+        if method != "POST" or string.find(body, 'reboot') == -1:
             raise NotImplemented
-        # only used by reboot() right now, but we will need to parse body someday !!!!
+            # only used by reboot() right now, but we will need to parse body someday !!!!
         return (httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED])
 
     def _v1_1_servers_72258(self, method, url, body, headers):
         if method != "DELETE":
             raise NotImplemented
-        # only used by destroy node()
+            # only used by destroy node()
         return (httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED])
 
     def _form_fixture_name(self, method, url, body, headers, suffix=''):
         scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
         action = re.sub('^/v[1-9]\.[0-9]', '', path)
-        action = action.replace('/','_')
-        
-        accept = headers.get('accept')
-        ext = (not accept or re.search('/json$',accept)) and '.json' or '.xml'
+        action = action.replace('/', '_')
 
-        return 'v1.1_' + method.lower()+action+suffix+ext
+        accept = headers.get('accept')
+        ext = (not accept or re.search('/json$', accept)) and '.json' or '.xml'
+
+        return 'v1.1_' + method.lower() + action + suffix + ext
 
     def _v1_1(self, method, url, body, headers):
         headers = {'x-server-management-url': 'http://test.url.faked:4444/v1.1',
                    'x-auth-token': 'faked-x-auth-token-for-test',
                    'x-cdn-management-url': '' #TODO verify normal auth response
-                    }
+        }
         return httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT]
 
     def _v1_1_servers_detail(self, method, url, body, headers):
@@ -244,4 +244,5 @@ class OpenStackMockHttp(MockHttp):
 
 if __name__ == '__main__':
     import sys
+
     sys.exit(unittest.main())

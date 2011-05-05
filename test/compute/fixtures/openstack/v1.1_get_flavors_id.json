@@ -8,7 +8,7 @@
             {
                 "rel" : "self",
                 "href" : "http://servers.api.openstack.org/v1.1/1234/flavors/1"
-                },
+            },
             {
                 "rel" : "bookmark",
                 "type" : "application/vnd.openstack.computev1.1+xml",

@@ -18,8 +18,9 @@ import httplib
 import re
 from urllib2 import urlparse
 from libcloud.common.types import InvalidCredsError
-from libcloud.compute.base import NodeImage, NodeSize, Node
+from libcloud.compute.base import NodeImage, Node
 from libcloud.compute.drivers.openstack import OpenStackNodeDriver, OpenstackNodeSize
+from libcloud.compute.types import NodeState
 from test import MockHttp
 from test.compute import TestCaseMixin
 from test.file_fixtures import ComputeFileFixtures
@@ -64,20 +65,28 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         node = ret[0]
         self.assertEqual(u'67.23.10.132', node.public_ip[0])
         self.assertEqual(u'10.176.42.16', node.private_ip[0])
-        self.assertEqual(node.extra.get('flavorRef'), '1')
-        self.assertEqual(node.extra.get('imageRef'), '11')
+        self.assertEqual(node.extra.get('flavorRef'), 'https://servers.api.rackspacecloud.com/v1.1/32278/flavors/1')
+        self.assertEqual(node.extra.get('imageRef'), 'https://servers.api.rackspacecloud.com/v1.1/32278/images/1234')
         self.assertEqual(type(node.extra.get('metadata')), type(dict()))
         OpenStackMockHttp.type = 'METADATA'
         ret = self.driver.list_nodes()
-        self.assertEqual(len(ret), 1)
+        self.assertEqual(len(ret), 2)
         node = ret[0]
         self.assertEqual(type(node.extra.get('metadata')), type(dict()))
-        self.assertEqual(node.extra.get('metadata').get('somekey'), 'somevalue')
+        self.assertEqual(node.extra.get('metadata').get('Server Label'), 'Web Head 1')
+        self.assertEqual(node.extra.get('metadata').get('Image Version'), '2.1')
         OpenStackMockHttp.type = None
+
+    def get_flavor_by_id(self, list, id):
+        for flavor in list:
+            if str(flavor.id) == str(id):
+                return flavor
+
 
     def test_list_sizes(self):
         ret = self.driver.list_sizes()
         self.assertEqual(len(ret), 2)
+        self.get_flavor_by_id(ret, 2)
         size = ret[0]
         self.assertEqual(size.name, '256 MB Server')
 
@@ -85,27 +94,50 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
 
     def test_list_images(self):
         ret = self.driver.list_images()
-        self.assertEqual(len(ret), 3)
+        self.assertAlmostEqual(len(ret), 2, 1)
 
-        self.assertEqual(ret[10].extra['serverRef'], None)
-        self.assertEqual(ret[11].extra['serverRef'], '91221')
+#         def __init__(self, id, name, driver, extra=None):
+#        self.id = str(id)
+#        self.name = name
+#        self.driver = driver
+#        if not extra:
+#            self.extra = {}
+#        else:
+#            self.extra = extra
+        first = ret[0]
+        last = ret[-1]
+        self.assertEqual(first.id, str(1))
+        self.assertEqual(first.name, 'CentOS 5.2')
+#        self.assertEqual(first.extra['serverRef'], None)
+        self.assertEqual(last.id, str(5))
+        self.assertEqual(last.name, 'CentOS 5.2')
+        #TODO self.assertEqual(last.extra['serverRef'], None)
 
     def test_create_node(self):
         image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver, extra={'links':[{'href':'http://servers.api.openstack.org/1234/flavors/1'}]})
         size = OpenstackNodeSize(1, '256 slice', None, None, None, None, driver=self.driver, links=[{'href':'http://servers.api.openstack.org/1234/flavors/1'}])
-        node = self.driver.create_node(name='racktest', image=image, size=size, shared_ip_group='group1')
-        self.assertEqual(node.name, 'racktest')
-        self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')
+        node = self.driver.create_node(name='new-server-test', image=image, size=size, shared_ip_group='group1')
+        self.assertEqual(node.id, str(1235))
+        self.assertEqual(node.driver, self.driver)
+        self.assertEquals(node.state, NodeState.PENDING)
+        self.assertEqual(node.name, 'new-server-test')
+        self.assertEqual(node.extra.get('created'),'2010-11-11T12:00:00Z')
+        self.assertEqual(node.extra.get('hostId'),'e4d909c290d0fb1ca068ffaddf22cbd0')
+        self.assertEqual(node.extra.get('imageRef'),'https://servers.api.openstack.org/v1.1/32278/images/1')
+        self.assertEqual(node.extra.get('flavorRef'),'http://servers.api.openstack.org/v1.1/32278/flavors/1')
+        self.assertEqual(node.extra.get('progress'),0)
+        self.assertEqual(node.extra.get('affinityId'), 'fc88bcf8394db9c8d0564e08ca6a9724188a84d1')
+        self.assertEqual(node.extra.get('adminPass'), 'GFf1j9aP')
 
     def test_create_node_with_metadata(self):
         OpenStackMockHttp.type = 'METADATA'
-        image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver)
-        size = NodeSize(1, '256 slice', None, None, None, None, driver=self.driver)
-        metadata = {'a': 'b', 'c': 'd'}
+        image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver, extra={'links':[{'href':'http://servers.api.openstack.org/1234/flavors/1'}]})
+        size = OpenstackNodeSize(1, '256 slice', None, None, None, None, driver=self.driver, links=[{'href':'http://servers.api.openstack.org/1234/flavors/1'}])
+        metadata = {u'My Server Name': u'Apache1'}
         files = {'/file1': 'content1', '/file2': 'content2'}
-        node = self.driver.create_node(name='racktest', image=image, size=size, metadata=metadata, files=files)
-        self.assertEqual(node.name, 'racktest')
-        self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')
+        node = self.driver.create_node(name='new-server-test', image=image, size=size, metadata=metadata, files=files)
+        self.assertEqual(node.name, 'new-server-test')
+        self.assertEqual(node.extra.get('adminPass'), u'GFf1j9aP')
         self.assertEqual(node.extra.get('metadata'), metadata)
 
     def test_reboot_node(self):
@@ -172,30 +204,34 @@ class OpenStackMockHttp(MockHttp):
     fixtures = ComputeFileFixtures('openstack')
 
     def _v1_1_UNAUTHORIZED(self, method, url, body, headers):
-        return  (httplib.UNAUTHORIZED, "", {}, httplib.responses[httplib.UNAUTHORIZED])
+        return  httplib.UNAUTHORIZED, "", {}, httplib.responses[httplib.UNAUTHORIZED]
 
     def _v1_1_UNAUTHORIZED_MISSING_KEY(self, method, url, body, headers):
         headers = {'x-auth-token': 'FE011C19-CF86-4F87-BE5D-9229145D7A06'}
         #                  'x-server-management-url': 'https://servers.api.rackspacecloud.com/v1.1',
 
         #                   'x-cdn-management-url': 'https://cdn.clouddrive.com/v1/MossoCloudFS_FE011C19-CF86-4F87-BE5D-9229145D7A06'}
-        return (httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT])
+        return httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT]
 
     def _v1_1_servers_detail_EMPTY(self, method, url, body, headers):
         body = self.fixtures.load(self._form_fixture_name(method, url, body, headers, '_empty'))
-        return (httplib.OK, body, {}, httplib.responses[httplib.OK])
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
+
+    def _v1_1_servers_detail_METADATA(self, method, url, body, headers):
+        body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
 
     def _v1_1_servers_72258_action(self, method, url, body, headers):
         if method != "POST" or string.find(body, 'reboot') == -1:
             raise NotImplemented
             # only used by reboot() right now, but we will need to parse body someday !!!!
-        return (httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED])
+        return httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED]
 
     def _v1_1_servers_72258(self, method, url, body, headers):
         if method != "DELETE":
             raise NotImplemented
             # only used by destroy node()
-        return (httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED])
+        return httplib.ACCEPTED, "", {}, httplib.responses[httplib.ACCEPTED]
 
     def _form_fixture_name(self, method, url, body, headers, suffix=''):
         scheme, netloc, path, params, query, fragment = urlparse.urlparse(url)
@@ -240,6 +276,12 @@ class OpenStackMockHttp(MockHttp):
 
     def _v1_1_servers_1234_action(self, method, url, body, headers):
         # invoked on /servers/1234/action, 1234 is the first server id in get_servers_detail.json fixture
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
+
+    def _v1_1_servers_METADATA(self, method, url, body, headers):
+        if method != "POST":
+            raise NotImplemented
+        body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
         return httplib.OK, body, {}, httplib.responses[httplib.OK]
 
 if __name__ == '__main__':

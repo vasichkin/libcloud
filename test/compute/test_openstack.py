@@ -19,7 +19,7 @@ import re
 from urllib2 import urlparse
 from libcloud.common.types import InvalidCredsError
 from libcloud.compute.base import NodeImage, NodeSize, Node
-from libcloud.compute.drivers.openstack import OpenStackNodeDriver
+from libcloud.compute.drivers.openstack import OpenStackNodeDriver, OpenstackNodeSize
 from test import MockHttp
 from test.compute import TestCaseMixin
 from test.file_fixtures import ComputeFileFixtures
@@ -91,8 +91,8 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertEqual(ret[11].extra['serverRef'], '91221')
 
     def test_create_node(self):
-        image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver)
-        size = NodeSize(1, '256 slice', None, None, None, None, driver=self.driver)
+        image = NodeImage(id=11, name='Ubuntu 8.10 (intrepid)', driver=self.driver, extra={'links':[{'href':'http://servers.api.openstack.org/1234/flavors/1'}]})
+        size = OpenstackNodeSize(1, '256 slice', None, None, None, None, driver=self.driver, links=[{'href':'http://servers.api.openstack.org/1234/flavors/1'}])
         node = self.driver.create_node(name='racktest', image=image, size=size, shared_ip_group='group1')
         self.assertEqual(node.name, 'racktest')
         self.assertEqual(node.extra.get('password'), 'racktestvJq7d3')

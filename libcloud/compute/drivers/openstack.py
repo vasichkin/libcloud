@@ -167,7 +167,7 @@ class OpenStackNodeDriver(NodeDriver):
         return [NodeLocation(id=0, name='OpenStack is private cloud', country='NoCountry', driver=self)]
 
     def list_sizes(self, location=None):
-        flavors_dict = self.connection.request('flavors/detail').object
+        flavors_dict = self.connection.request('/flavors/detail').object
         try:
             flavors = flavors_dict['flavors']
             values = flavors
@@ -179,17 +179,18 @@ class OpenStackNodeDriver(NodeDriver):
         self.list_sizes()
 
     def _to_size(self, el):
-        s = NodeSize(id=el.get('id'),
+        s = OpenstackNodeSize(id=el.get('id'),
                      ram=int(el.get('ram')),
                      disk=int(el.get('disk')),
-                     name=el.get('links'),
+                     name=el.get('name'),
                      price=None,
                      bandwidth=None,
-                     driver=self.connection.driver)
+                     driver=self.connection.driver,
+                     links=el.get('links'))
         return s
     
     def list_images(self, location=None):
-        images_dict = self.connection.request('images/detail').object
+        images_dict = self.connection.request('/images/detail').object
         try:
             images = images_dict['images']
             values = images
@@ -232,7 +233,7 @@ class OpenStackNodeDriver(NodeDriver):
         ex_metadata = kwargs.get('ex_metadata')
         ex_personality = kwargs.get('ex_personality')
 
-        flavorRef = node_size.name[0]['href']
+        flavorRef = node_size.links[0]['href']
         imageRef = node_image.extra['links'][0]['href']
         request = {'server': {'name': name, 'flavorRef': flavorRef, 'imageRef': imageRef}}
         if ex_metadata:
@@ -241,7 +242,7 @@ class OpenStackNodeDriver(NodeDriver):
             request['server']['personality']=ex_personality
 
         data=json.dumps(request)
-        resp = self.connection.request("servers", method='POST', data=data)
+        resp = self.connection.request("/servers", method='POST', data=data)
         try:
             server_dict = resp.object['server']
         except KeyError:
@@ -255,8 +256,8 @@ class OpenStackNodeDriver(NodeDriver):
         n = Node(id=server_dict.get('id'),
                  name=server_dict.get('name'),
                  state=self.NODE_STATE_MAP.get(server_dict.get('status'), NodeState.UNKNOWN),
-                 public_ip=ips.public_ipv4[0],
-                 private_ip=ips.private_ipv4[0],
+                 public_ip=ips.public_ipv4, #list of addresses
+                 private_ip=ips.private_ipv4, #list of addresses
                  driver=self.connection.driver,
                  extra={
                     'adminPass': server_dict.get('adminPass'),
@@ -296,7 +297,7 @@ class OpenStackNodeDriver(NodeDriver):
         return resp
 
     def ex_rebuild(self, node_id, image_id): #TODO support real data
-        resp = self.connection.request("servers/%s/action" % node_id,
+        resp = self.connection.request("/servers/%s/action" % node_id,
                                        method='POST',
                                        data='')
         return resp.status == 202
@@ -329,3 +330,10 @@ class OpenStackIps(object):
                 out_list_v4.append(ip['addr'])
             if ip['version'] == 6:
                 out_list_v6.append(ip['addr'])
+
+class OpenstackNodeSize(NodeSize):
+    """ extends base NodeSize with links section """
+    links = []
+    def __init__(self, id, name, ram, disk, bandwidth, price, driver, links):
+        super(OpenstackNodeSize, self).__init__(id, name, ram, disk, bandwidth, price, driver)
+        self.links = links

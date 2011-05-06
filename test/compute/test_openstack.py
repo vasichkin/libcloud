@@ -157,12 +157,13 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertTrue("rate" in limits)
         self.assertTrue("absolute" in limits)
 
-    def test_ex_save_image(self):
-        node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
-                    driver=self.driver)
-        image = self.driver.ex_save_image(node, "imgtest")
-        self.assertEqual(image.name, "imgtest")
-        self.assertEqual(image.id, "12345")
+#   not implemented in OpenStack
+#    def test_ex_save_image(self):
+#        node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
+#                    driver=self.driver)
+#        image = self.driver.ex_save_image(node, "imgtest")
+#        self.assertEqual(image.name, "imgtest")
+#        self.assertEqual(image.id, "12345")
 
 # Listing IPs by node is not implemented in OpenStack yet
 #    def test_ex_list_ip_addresses(self):

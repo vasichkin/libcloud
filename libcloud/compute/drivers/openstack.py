@@ -26,7 +26,8 @@ from libcloud.compute.base import NodeSize, NodeImage
 
 class OpenStackResponse(Response):
 
-    def success(self):
+    @staticmethod
+    def is_success(status):
         """
          GET /servers /servers/detail code 200 203
          POST /servers code 202
@@ -43,8 +44,11 @@ class OpenStackResponse(Response):
          GET /images/id code 200, 203
          DELETE /images/id code 204
         """
-        i = int(self.status)
+        i = int(status)
         return i == 200 or i==202 or i == 203 or i == 204
+
+    def success(self):
+        return OpenStackResponse.is_success(self.status)
 
     def parse_body(self):
         if not self.body:
@@ -276,7 +280,7 @@ class OpenStackNodeDriver(NodeDriver):
     def destroy_node(self, node):
         uri = '/servers/%s' % node.id
         resp = self.connection.request(uri, method='DELETE')
-        return resp.status == 204
+        return OpenStackResponse.is_success(resp.status)
 
     def reboot_node(self, node):
         return self._reboot_node(node, reboot_type='HARD')

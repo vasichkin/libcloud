@@ -90,8 +90,6 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         size = ret[0]
         self.assertEqual(size.name, '256 MB Server')
 
-    #        self.assertTrue(isinstance(size.price, float))
-
     def test_list_images(self):
         ret = self.driver.list_images()
         self.assertAlmostEqual(len(ret), 2, 1)
@@ -157,7 +155,9 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertTrue("rate" in limits)
         self.assertTrue("absolute" in limits)
 
-#   not implemented in OpenStack
+# *** Commented because: saving image from node is not implemented in OpenStack yet
+#TODO: uncomment after OpenStack is fixed and libcloud is updated accordingly
+
 #    def test_ex_save_image(self):
 #        node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
 #                    driver=self.driver)
@@ -165,7 +165,9 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
 #        self.assertEqual(image.name, "imgtest")
 #        self.assertEqual(image.id, "12345")
 
-# Listing IPs by node is not implemented in OpenStack yet
+# *** Commented because: listing IPs by node is not implemented in OpenStack yet
+#TODO: uncomment after OpenStack is fixed and libcloud is updated accordingly
+
 #    def test_ex_list_ip_addresses(self):
 #        ret = self.driver.ex_list_ip_addresses(node_id=72258)
 #        self.assertEquals(2, len(ret.public_addresses))
@@ -210,9 +212,6 @@ class OpenStackMockHttp(MockHttp):
 
     def _v1_1_UNAUTHORIZED_MISSING_KEY(self, method, url, body, headers):
         headers = {'x-auth-token': 'FE011C19-CF86-4F87-BE5D-9229145D7A06'}
-        #                  'x-server-management-url': 'https://servers.api.rackspacecloud.com/v1.1',
-
-        #                   'x-cdn-management-url': 'https://cdn.clouddrive.com/v1/MossoCloudFS_FE011C19-CF86-4F87-BE5D-9229145D7A06'}
         return httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT]
 
     def _v1_1_servers_detail_EMPTY(self, method, url, body, headers):

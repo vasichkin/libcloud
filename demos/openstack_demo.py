@@ -22,9 +22,11 @@
 # See docstrings for usage examples.
 #
 
+from pprint import pprint
+import traceback
+
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
-import pprint
 
 def main():
     """Main OpenStack Demo
@@ -58,6 +60,7 @@ def main():
         nodes = open_stack.list_nodes()
         pprint(nodes)
     except Exception:
+        print traceback.print_exc()
         return 1
 
     print ">> Loading images... (showing up to 10)"
@@ -71,6 +74,7 @@ def main():
     instance = open_stack.create_node(name='create_image_demo',
                            image=images[0],
                            size=sizes[0])
+    #TODO: add check status of instance
     instance.destroy()
     return 0
 

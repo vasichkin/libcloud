@@ -284,6 +284,10 @@ class OpenStackMockHttp(MockHttp):
         body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
         return httplib.OK, body, {}, httplib.responses[httplib.OK]
 
+    def _v1_1_limits(self, method, url, body, headers):
+        body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
+
 if __name__ == '__main__':
     import sys
 

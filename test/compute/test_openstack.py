@@ -90,8 +90,6 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         size = ret[0]
         self.assertEqual(size.name, '256 MB Server')
 
-    #        self.assertTrue(isinstance(size.price, float))
-
     def test_list_images(self):
         ret = self.driver.list_images()
         self.assertAlmostEqual(len(ret), 2, 1)
@@ -157,47 +155,53 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertTrue("rate" in limits)
         self.assertTrue("absolute" in limits)
 
-    def test_ex_save_image(self):
-        node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
-                    driver=self.driver)
-        image = self.driver.ex_save_image(node, "imgtest")
-        self.assertEqual(image.name, "imgtest")
-        self.assertEqual(image.id, "12345")
+# *** Commented because: saving image from node is not implemented in OpenStack yet
+#TODO: uncomment after OpenStack is fixed and libcloud is updated accordingly
 
-    def test_ex_list_ip_addresses(self):
-        ret = self.driver.ex_list_ip_addresses(node_id=72258)
-        self.assertEquals(2, len(ret.public_addresses))
-        self.assertTrue('67.23.10.131' in ret.public_addresses)
-        self.assertTrue('67.23.10.132' in ret.public_addresses)
-        self.assertEquals(1, len(ret.private_addresses))
-        self.assertTrue('10.176.42.16' in ret.private_addresses)
-        #
-        #    def test_ex_list_ip_groups(self):
-        #        ret = self.driver.ex_list_ip_groups()
-        #        self.assertEquals(2, len(ret))
-        #        self.assertEquals('1234', ret[0].id)
-        #        self.assertEquals('Shared IP Group 1', ret[0].name)
-        #        self.assertEquals('5678', ret[1].id)
-        #        self.assertEquals('Shared IP Group 2', ret[1].name)
-        #        self.assertTrue(ret[0].servers is None)
-        #
-        #    def test_ex_list_ip_groups_detail(self):
-        #        ret = self.driver.ex_list_ip_groups(details=True)
+#    def test_ex_save_image(self):
+#        node = Node(id=444222, name=None, state=None, public_ip=None, private_ip=None,
+#                    driver=self.driver)
+#        image = self.driver.ex_save_image(node, "imgtest")
+#        self.assertEqual(image.name, "imgtest")
+#        self.assertEqual(image.id, "12345")
 
-        self.assertEquals(2, len(ret))
+# *** Commented because: listing IPs by node is not implemented in OpenStack yet
+#TODO: uncomment after OpenStack is fixed and libcloud is updated accordingly
 
-        self.assertEquals('1234', ret[0].id)
-        self.assertEquals('Shared IP Group 1', ret[0].name)
-        self.assertEquals(2, len(ret[0].servers))
-        self.assertEquals('422', ret[0].servers[0])
-        self.assertEquals('3445', ret[0].servers[1])
-
-        self.assertEquals('5678', ret[1].id)
-        self.assertEquals('Shared IP Group 2', ret[1].name)
-        self.assertEquals(3, len(ret[1].servers))
-        self.assertEquals('23203', ret[1].servers[0])
-        self.assertEquals('2456', ret[1].servers[1])
-        self.assertEquals('9891', ret[1].servers[2])
+#    def test_ex_list_ip_addresses(self):
+#        ret = self.driver.ex_list_ip_addresses(node_id=72258)
+#        self.assertEquals(2, len(ret.public_addresses))
+#        self.assertTrue('67.23.10.131' in ret.public_addresses)
+#        self.assertTrue('67.23.10.132' in ret.public_addresses)
+#        self.assertEquals(1, len(ret.private_addresses))
+#        self.assertTrue('10.176.42.16' in ret.private_addresses)
+#        #
+#        #    def test_ex_list_ip_groups(self):
+#        #        ret = self.driver.ex_list_ip_groups()
+#        #        self.assertEquals(2, len(ret))
+#        #        self.assertEquals('1234', ret[0].id)
+#        #        self.assertEquals('Shared IP Group 1', ret[0].name)
+#        #        self.assertEquals('5678', ret[1].id)
+#        #        self.assertEquals('Shared IP Group 2', ret[1].name)
+#        #        self.assertTrue(ret[0].servers is None)
+#        #
+#        #    def test_ex_list_ip_groups_detail(self):
+#        #        ret = self.driver.ex_list_ip_groups(details=True)
+#
+#        self.assertEquals(2, len(ret))
+#
+#        self.assertEquals('1234', ret[0].id)
+#        self.assertEquals('Shared IP Group 1', ret[0].name)
+#        self.assertEquals(2, len(ret[0].servers))
+#        self.assertEquals('422', ret[0].servers[0])
+#        self.assertEquals('3445', ret[0].servers[1])
+#
+#        self.assertEquals('5678', ret[1].id)
+#        self.assertEquals('Shared IP Group 2', ret[1].name)
+#        self.assertEquals(3, len(ret[1].servers))
+#        self.assertEquals('23203', ret[1].servers[0])
+#        self.assertEquals('2456', ret[1].servers[1])
+#        self.assertEquals('9891', ret[1].servers[2])
 
 
 class OpenStackMockHttp(MockHttp):
@@ -208,9 +212,6 @@ class OpenStackMockHttp(MockHttp):
 
     def _v1_1_UNAUTHORIZED_MISSING_KEY(self, method, url, body, headers):
         headers = {'x-auth-token': 'FE011C19-CF86-4F87-BE5D-9229145D7A06'}
-        #                  'x-server-management-url': 'https://servers.api.rackspacecloud.com/v1.1',
-
-        #                   'x-cdn-management-url': 'https://cdn.clouddrive.com/v1/MossoCloudFS_FE011C19-CF86-4F87-BE5D-9229145D7A06'}
         return httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT]
 
     def _v1_1_servers_detail_EMPTY(self, method, url, body, headers):

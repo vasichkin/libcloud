@@ -194,10 +194,9 @@ class OpenStackNodeDriver(NodeDriver):
         images_dict = self.connection.request('/images/detail').object
         try:
             images = images_dict['images']
-            values = images
         except KeyError:
-            raise MalformedResponseError(value='no images-values clause', body=images_dict, driver=self)
-        return [ self._to_image(value) for value in values if value.get('status') == 'ACTIVE' ]
+            raise MalformedResponseError(value='no images clause', body=images_dict, driver=self)
+        return [ self._to_image(image) for image in images if image.get('status') == 'ACTIVE' ]
 
     def _to_image(self, el):
         i = NodeImage(id=el.get('id'),
@@ -309,6 +308,10 @@ class OpenStackNodeDriver(NodeDriver):
         if resp.status == 404:
             return None
         return self._to_node(resp.object)
+
+    def ex_limits(self):
+        resp = self.connection.request('/limits', method='GET')
+        return resp.object['limits']
 
 class OpenStackIps(object):
     """

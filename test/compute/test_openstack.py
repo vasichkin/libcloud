@@ -164,40 +164,41 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
         self.assertEqual(image.name, "imgtest")
         self.assertEqual(image.id, "12345")
 
-    def test_ex_list_ip_addresses(self):
-        ret = self.driver.ex_list_ip_addresses(node_id=72258)
-        self.assertEquals(2, len(ret.public_addresses))
-        self.assertTrue('67.23.10.131' in ret.public_addresses)
-        self.assertTrue('67.23.10.132' in ret.public_addresses)
-        self.assertEquals(1, len(ret.private_addresses))
-        self.assertTrue('10.176.42.16' in ret.private_addresses)
-        #
-        #    def test_ex_list_ip_groups(self):
-        #        ret = self.driver.ex_list_ip_groups()
-        #        self.assertEquals(2, len(ret))
-        #        self.assertEquals('1234', ret[0].id)
-        #        self.assertEquals('Shared IP Group 1', ret[0].name)
-        #        self.assertEquals('5678', ret[1].id)
-        #        self.assertEquals('Shared IP Group 2', ret[1].name)
-        #        self.assertTrue(ret[0].servers is None)
-        #
-        #    def test_ex_list_ip_groups_detail(self):
-        #        ret = self.driver.ex_list_ip_groups(details=True)
-
-        self.assertEquals(2, len(ret))
-
-        self.assertEquals('1234', ret[0].id)
-        self.assertEquals('Shared IP Group 1', ret[0].name)
-        self.assertEquals(2, len(ret[0].servers))
-        self.assertEquals('422', ret[0].servers[0])
-        self.assertEquals('3445', ret[0].servers[1])
-
-        self.assertEquals('5678', ret[1].id)
-        self.assertEquals('Shared IP Group 2', ret[1].name)
-        self.assertEquals(3, len(ret[1].servers))
-        self.assertEquals('23203', ret[1].servers[0])
-        self.assertEquals('2456', ret[1].servers[1])
-        self.assertEquals('9891', ret[1].servers[2])
+# Listing IPs by node is not implemented in OpenStack yet
+#    def test_ex_list_ip_addresses(self):
+#        ret = self.driver.ex_list_ip_addresses(node_id=72258)
+#        self.assertEquals(2, len(ret.public_addresses))
+#        self.assertTrue('67.23.10.131' in ret.public_addresses)
+#        self.assertTrue('67.23.10.132' in ret.public_addresses)
+#        self.assertEquals(1, len(ret.private_addresses))
+#        self.assertTrue('10.176.42.16' in ret.private_addresses)
+#        #
+#        #    def test_ex_list_ip_groups(self):
+#        #        ret = self.driver.ex_list_ip_groups()
+#        #        self.assertEquals(2, len(ret))
+#        #        self.assertEquals('1234', ret[0].id)
+#        #        self.assertEquals('Shared IP Group 1', ret[0].name)
+#        #        self.assertEquals('5678', ret[1].id)
+#        #        self.assertEquals('Shared IP Group 2', ret[1].name)
+#        #        self.assertTrue(ret[0].servers is None)
+#        #
+#        #    def test_ex_list_ip_groups_detail(self):
+#        #        ret = self.driver.ex_list_ip_groups(details=True)
+#
+#        self.assertEquals(2, len(ret))
+#
+#        self.assertEquals('1234', ret[0].id)
+#        self.assertEquals('Shared IP Group 1', ret[0].name)
+#        self.assertEquals(2, len(ret[0].servers))
+#        self.assertEquals('422', ret[0].servers[0])
+#        self.assertEquals('3445', ret[0].servers[1])
+#
+#        self.assertEquals('5678', ret[1].id)
+#        self.assertEquals('Shared IP Group 2', ret[1].name)
+#        self.assertEquals(3, len(ret[1].servers))
+#        self.assertEquals('23203', ret[1].servers[0])
+#        self.assertEquals('2456', ret[1].servers[1])
+#        self.assertEquals('9891', ret[1].servers[2])
 
 
 class OpenStackMockHttp(MockHttp):

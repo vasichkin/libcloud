@@ -44,8 +44,7 @@ class OpenStackResponse(Response):
          GET /images/id code 200, 203
          DELETE /images/id code 204
         """
-        i = int(status)
-        return i == 200 or i==202 or i == 203 or i == 204
+        return int(status) in (200, 202, 203, 204)
 
     def success(self):
         return OpenStackResponse.is_success(self.status)

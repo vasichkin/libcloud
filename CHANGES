@@ -1,6 +1,11 @@
                                                         -*- coding: utf-8 -*-
 
 Changes with Apache Libcloud 0.4.3
+    *) Add OpenStack driver API 1.1, independent driver that allows to
+       work with user's OpenStack installation.
+       Meets OpenStack revision 1054
+       [Eugene Polyan]
+
     *) Add implementation for the following methods to the CloudFiles
        storage driver: enable_container_cdn(), get_container_cdn_url(),
        get_object_cdn_url()

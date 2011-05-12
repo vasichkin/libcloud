@@ -65,7 +65,6 @@ class OpenStackResponse1_1(Response):
 
 class OpenStackConnection1_1(ConnectionUserAndKey):
     """ Connection class for the OpenStack driver """
-    
     responseCls = OpenStackResponse1_1
 
     def __init__(self, user_name, api_key, url, secure):
@@ -79,7 +78,6 @@ class OpenStackConnection1_1(ConnectionUserAndKey):
         return data
 
     def request(self, action, params=None, data='', headers=None, method='GET', raw=False):
-
         if not self.auth_token:#TODO deal with token expiration
             self._auth()
         
@@ -124,7 +122,7 @@ class OpenStackConnection1_1(ConnectionUserAndKey):
             self.auth_token = headers['x-auth-token']
         except KeyError:
             raise InvalidCredsError()
-        
+
 class OpenStackNodeDriver1_1(NodeDriver):
     """ OpenStack node driver. """
     connectionCls = OpenStackConnection1_1
@@ -173,8 +171,7 @@ class OpenStackNodeDriver1_1(NodeDriver):
     def list_sizes(self, location=None):
         flavors_dict = self.connection.request('/flavors/detail').object
         try:
-            flavors = flavors_dict['flavors']
-            values = flavors
+            values = flavors_dict['flavors']
         except KeyError:
             raise MalformedResponseError(value='no flavors-values clause', body=flavors_dict, driver=self)
         return [ self._to_size(value) for value in values ]
@@ -192,7 +189,7 @@ class OpenStackNodeDriver1_1(NodeDriver):
                      driver=self.connection.driver,
                      links=el.get('links'))
         return s
-    
+
     def list_images(self, location=None):
         images_dict = self.connection.request('/images/detail').object
         try:
@@ -211,8 +208,7 @@ class OpenStackNodeDriver1_1(NodeDriver):
     def list_nodes(self):
         servers_dict = self.connection.request('/servers/detail').object
         try:
-            servers = servers_dict['servers']
-            values = servers
+            values = servers_dict['servers']
         except KeyError:
             raise MalformedResponseError(value='in list_nodes: no servers-values clause', body=servers_dict, driver=self)
         return [ self._to_node(value) for value in values ]
@@ -222,7 +218,6 @@ class OpenStackNodeDriver1_1(NodeDriver):
 
     def create_node(self, **kwargs):
         """Create a new node
-
         See L{NodeDriver.create_node} for more keyword args.
         @keyword    ex_metadata: Key/Value metadata to associate with a node
         @type       ex_metadata: C{dict}
@@ -244,7 +239,7 @@ class OpenStackNodeDriver1_1(NodeDriver):
         if ex_personality:
             request['server']['personality']=ex_personality
 
-        data=json.dumps(request)
+        data = json.dumps(request)
         resp = self.connection.request("/servers", method='POST', data=data)
         try:
             server_dict = resp.object['server']
@@ -270,7 +265,7 @@ class OpenStackNodeDriver1_1(NodeDriver):
                     'hostId': server_dict.get('hostId'),
                     'id': server_dict.get('id'),
                     'imageRef': server_dict.get('imageRef'),
-                    'links':  server_dict.get('links'),
+                    'links': server_dict.get('links'),
                     'metadata': server_dict.get('metadata'),
                     'progress': server_dict.get('progress')
                  })
@@ -318,9 +313,9 @@ class OpenStackNodeDriver1_1(NodeDriver):
 
 class OpenStackIps1_1(object):
     """
-        Contains the list of public and private IPs
-        @keyword    ip_list: IPs with the structure C{dict} {'values'}: [{'version':4, 'addr':''}, ], 'id' : 'public'}
-        @type       ip_list: C{list}
+    Contains the list of public and private IPs
+    @keyword    ip_list: IPs with the structure C{dict} {'values'}: [{'version':4, 'addr':''}, ], 'id' : 'public'}
+    @type       ip_list: C{list}
     """
     public_ipv4 = []
     private_ipv4 = []

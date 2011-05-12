@@ -349,12 +349,12 @@ class ConnectionKey(object):
         self.method = method
         # Extend default parameters
         params = self.add_default_params(params)
-        # Extend default headers
-        headers = self.add_default_headers(headers)
         # We always send a user-agent header
         headers.update({'User-Agent': self._user_agent()})
         host = host or self.host
         headers.update({'Host': host})
+        # Extend default headers
+        headers = self.add_default_headers(headers)
         # Encode data if necessary
         if data != '' and data != None:
             data = self.encode_data(data)

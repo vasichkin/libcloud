@@ -99,6 +99,7 @@ class OpenStackConnection1_1(ConnectionUserAndKey):
         headers['X-Auth-Token'] = self.auth_token
         #TODO add parametrised accept
         headers['Accept'] = 'application/json'
+        headers['Host'] = "%s:%s" % (self.host, self.port[self.secure])
         return headers
 
     def _auth(self):

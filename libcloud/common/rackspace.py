@@ -32,27 +32,22 @@ __all__ = [
     ]
 
 class RackspaceBaseConnection(ConnectionUserAndKey):
-    def __init__(self, user_id, key, secure):
+    def __init__(self, user_id, key, secure, host=None, port=None):
         self.cdn_management_url = None
         self.storage_url = None
         self.auth_token = None
-        self.__host = None
+        self.request_path = None
         super(RackspaceBaseConnection, self).__init__(
-            user_id, key, secure=secure)
+            user_id, key, secure=secure, host=host, port=port)
 
     def add_default_headers(self, headers):
         headers['X-Auth-Token'] = self.auth_token
-        headers['Accept'] = self.accept_format
+        headers['Accept'] = "application/xml"
         return headers
 
     @property
     def request_path(self):
         return self._get_request_path(url_key=self._url_key)
-
-    @property
-    def host(self):
-        # Default to server_host
-        return self._get_host(url_key=self._url_key)
 
     def _get_request_path(self, url_key):
         value_key = '__request_path_%s' % (url_key)
@@ -81,7 +76,11 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
         request yet, do it here. Otherwise, just return the management host.
         """
         if not self.auth_token:
-            # Initial connection used for authentication
+           self._auth() 
+
+    def _auth(self):
+        conn = None
+        try:
             conn = self.conn_classes[self.secure](
                 self.auth_host, self.port[self.secure])
             conn.request(
@@ -126,5 +125,37 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
                 # Set host to where we want to make further requests to
                 setattr(self, '__%s' % (key), server)
                 setattr(self, '__request_path_%s' % (key), request_path)
+        finally:
+            if conn:
+                conn.close()
 
-            conn.close()
+    def request(self, action, params=None, data='', headers=None,
+                method='GET', raw=False):
+
+        if not self.auth_token:
+            self._auth()
+
+        attempt = 0
+        response = None
+        
+        while attempt < 2:
+            response = super(RackspaceBaseConnection, self).request(
+                action=action,
+                params=params, data=data,
+                method=method, headers=headers
+            )
+
+            if response.status != 401:
+                return response
+            else:
+                #auth token expired, need to refresh it and retry once
+                attempt += 1
+                self._auth()
+
+        return response
+
+    @property
+    def host(self):
+        # Default to server_host
+        return self._get_host(url_key=self._url_key)
+

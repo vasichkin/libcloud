@@ -16,7 +16,7 @@
 Rackspace driver
 """
 import os
-
+import json
 import base64
 
 from xml.etree import ElementTree as ET
@@ -34,12 +34,125 @@ from libcloud.common.rackspace import (
 
 NAMESPACE='http://docs.rackspacecloud.com/servers/api/v1.0'
 
-
-class RackspaceResponse(Response):
+class MossoBasedResponse(Response):
+    @staticmethod
+    def is_success(status):
+        """ does this status stands for success """
+        i = int(status)
+        return i >= 200 and i <= 299
 
     def success(self):
-        i = int(self.status)
-        return i >= 200 and i <= 299
+        return self.is_success(self.status)
+
+
+class MossoBasedConnection(RackspaceBaseConnection):
+    """
+    Base class for Connection to server management API derived from Mosso:
+    OpenStack and RackSpace original one (Mosso itself)
+    """
+
+    def __init__(self, user_id, key, secure, host=None, port=None):
+        super(MossoBasedConnection, self).__init__(user_id, key, secure,
+                                                   host, port)
+
+
+    def request(self, action, params=None, data='', headers=None,
+                method='GET', raw=False):
+
+        if not self.auth_token:
+            self._auth()
+
+        if not headers:
+            headers = {}
+        if not params:
+            params = {}
+
+        action = self.server_url + action
+
+        self._set_additional_headers(action, method, params, headers, data)
+
+        #TODO set cache expiration headers
+
+        response = super(MossoBasedConnection, self).request(
+            action=action,
+            params=params, data=data,
+            method=method, headers=headers
+        )
+
+        return response
+
+
+    def _set_additional_headers(self, action, method, params, headers, data):
+        """
+        Set driver & request specific headers for the request,
+
+        Please note: headers should be dict which is modified
+        """
+
+        pass
+
+
+class MossoBasedNodeDriver(NodeDriver):
+    """ Base class for NodeDrivers for Mosso based server
+    management API (Rackspace and OpenStack)
+    """
+
+    def reboot_node(self, node):
+        return self._reboot_node(node, reboot_type='HARD')
+
+    def ex_soft_reboot_node(self, node):
+        return self._reboot_node(node, reboot_type='SOFT')
+
+    def ex_hard_reboot_node(self, node):
+        return self._reboot_node(node, reboot_type='HARD')
+
+    def _reboot_node(self, node, reboot_type):
+        resp = self._node_action(node, ('reboot', {'type': reboot_type}))
+        return resp.status == 202
+
+    def destroy_node(self, node):
+        uri = '/servers/%s' % node.id
+        resp = self.connection.request(uri, method='DELETE')
+        return self.connection.responseCls.is_success(resp.status)
+
+    def ex_get_node_details(self, node_id):
+        uri = '/servers/%s' % node_id
+        resp = self.connection.request(uri, method='GET')
+        if resp.status == 404:
+            return None
+        return self._to_node(resp.object)
+
+    def _node_action(self, node, body):
+        uri = '/servers/%s/action' % node.id
+        resp = self.connection.request(uri, method='POST', data=body)
+        return resp
+
+    def list_nodes(self):
+        return self._to_nodes(self.connection.request('/servers/detail').object)
+
+    def list_sizes(self, location=None):
+        return self._to_sizes(self.connection.request('/flavors/detail').object)
+
+    def list_images(self, location=None):
+        return self._to_images(self.connection.request('/images/detail').object)
+
+    def _to_nodes(self, response_object):
+        raise NotImplementedError('implement _to_nodes in successor')
+
+    def _to_node(self, node_object):
+        raise NotImplementedError('implement _to_node in successor')
+
+    def _to_images(self, response_object):
+        raise NotImplementedError('implement _to_images in successor')
+
+    def _to_image(self, image_object):
+        raise NotImplementedError('implement _to_image in successor')
+
+    def _to_sizes(self, response_object):
+        raise NotImplementedError('implement _to_sizes in successor')
+
+
+class RackspaceResponse(MossoBasedResponse):
 
     def parse_body(self):
         if not self.body:
@@ -52,6 +165,7 @@ class RackspaceResponse(Response):
                 body=self.body,
                 driver=RackspaceNodeDriver)
         return body
+
     def parse_error(self):
         # TODO: fixup, Rackspace only uses response codes really!
         try:
@@ -70,7 +184,7 @@ class RackspaceResponse(Response):
         return '%s %s %s' % (self.status, self.error, text)
 
 
-class RackspaceConnection(RackspaceBaseConnection):
+class RackspaceConnection(MossoBasedConnection):
     """
     Connection class for the Rackspace driver
     """
@@ -82,25 +196,16 @@ class RackspaceConnection(RackspaceBaseConnection):
     def __init__(self, user_id, key, secure=True):
         super(RackspaceConnection, self).__init__(user_id, key, secure)
         self.api_version = 'v1.0'
-        self.accept_format = 'application/xml'
 
-    def request(self, action, params=None, data='', headers=None, method='GET'):
-        if not headers:
-            headers = {}
-        if not params:
-            params = {}
-        # Due to first-run authentication request, we may not have a path
-        if self.server_url:
-            action = self.server_url + action
+    def _set_additional_headers(self, action, params, data, headers, method):
+        """ Set driver specific headers for request
+        note that headers should be a dict, which is modified """
+
         if method in ("POST", "PUT"):
-            headers = {'Content-Type': 'application/xml; charset=UTF-8'}
+            headers['Content-Type'] = 'application/xml; charset=UTF-8'
+
         if method == "GET":
             params['cache-busting'] = os.urandom(8).encode('hex')
-        return super(RackspaceConnection, self).request(
-            action=action,
-            params=params, data=data,
-            method=method, headers=headers
-        )
 
 
 class RackspaceSharedIpGroup(object):
@@ -124,7 +229,7 @@ class RackspaceNodeIpAddresses(object):
         self.private_addresses = private_addresses
 
 
-class RackspaceNodeDriver(NodeDriver):
+class RackspaceNodeDriver(MossoBasedNodeDriver):
     """
     Rackspace node driver.
 
@@ -153,22 +258,12 @@ class RackspaceNodeDriver(NodeDriver):
                        'VERIFY_RESIZE': NodeState.RUNNING,
                        'PASSWORD': NodeState.PENDING,
                        'RESCUE': NodeState.PENDING,
-                       'REBUILD': NodeState.PENDING,
                        'REBOOT': NodeState.REBOOTING,
                        'HARD_REBOOT': NodeState.REBOOTING,
                        'SHARE_IP': NodeState.PENDING,
                        'SHARE_IP_NO_CONFIG': NodeState.PENDING,
                        'DELETE_IP': NodeState.PENDING,
                        'UNKNOWN': NodeState.UNKNOWN}
-
-    def list_nodes(self):
-        return self._to_nodes(self.connection.request('/servers/detail').object)
-
-    def list_sizes(self, location=None):
-        return self._to_sizes(self.connection.request('/flavors/detail').object)
-
-    def list_images(self, location=None):
-        return self._to_images(self.connection.request('/images/detail').object)
 
     def list_locations(self):
         """Lists available locations
@@ -357,39 +452,21 @@ class RackspaceNodeDriver(NodeDriver):
 
         return personality_elm
 
-    def _reboot_node(self, node, reboot_type='SOFT'):
-        resp = self._node_action(node, ['reboot', ('type', reboot_type)])
-        return resp.status == 202
-
-    def ex_soft_reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='SOFT')
-
-    def ex_hard_reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='HARD')
-
-    def reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='HARD')
-
-    def destroy_node(self, node):
-        uri = '/servers/%s' % (node.id)
-        resp = self.connection.request(uri, method='DELETE')
-        return resp.status == 202
-
-    def ex_get_node_details(self, node_id):
-        uri = '/servers/%s' % (node_id)
-        resp = self.connection.request(uri, method='GET')
-        if resp.status == 404:
-            return None
-        return self._to_node(resp.object)
-
     def _node_action(self, node, body):
-        if isinstance(body, list):
-            attr = ' '.join(['%s="%s"' % (item[0], item[1])
-                             for item in body[1:]])
+        """
+        Perform an action on a node
+
+        node -- node_id
+        body is either a string ready for Iaas provider or
+        a tuple (actionname, args), where actionname is a string
+        with action name and args is a dict of arguments
+        """
+
+        if getattr(body, '__iter__', False):
+            attr = ' '.join(['%s="%s"' % (k, v)
+                             for (k, v) in body[1].items()])
             body = '<%s xmlns="%s" %s/>' % (body[0], NAMESPACE, attr)
-        uri = '/servers/%s/action' % (node.id)
-        resp = self.connection.request(uri, method='POST', data=body)
-        return resp
+        return super(RackspaceNodeDriver, self)._node_action(node, body)
 
     def _to_nodes(self, object):
         node_elements = self._findall(object, 'server')

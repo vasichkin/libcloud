@@ -18,13 +18,17 @@
 import httplib
 import json
 import urlparse
-from libcloud.common.base import Response, ConnectionUserAndKey
+
 from libcloud.common.types import MalformedResponseError, InvalidCredsError
 from libcloud.compute.types import NodeState, Provider
-from libcloud.compute.base import NodeDriver, Node, NodeLocation
+from libcloud.compute.base import Node, NodeLocation
 from libcloud.compute.base import NodeSize, NodeImage
+from libcloud.compute.drivers.rackspace import MossoBasedNodeDriver
+from libcloud.compute.drivers.rackspace import MossoBasedResponse
+from libcloud.compute.drivers.rackspace import MossoBasedConnection
 
-class OpenStackResponse(Response):
+
+class OpenStackResponse(MossoBasedResponse):
 
     @staticmethod
     def is_success(status):
@@ -46,16 +50,15 @@ class OpenStackResponse(Response):
         """
         return int(status) in (200, 202, 203, 204)
 
-    def success(self):
-        return OpenStackResponse.is_success(self.status)
-
     def parse_body(self):
         if not self.body:
             return None
         try:
             body = json.loads(self.body)
         except:
-            raise MalformedResponseError("Failed to parse JSON", body=self.body, driver=OpenStackNodeDriver)
+            raise MalformedResponseError("Failed to parse JSON",
+                                         body=self.body,
+                                         driver=OpenStackNodeDriver)
         return body
 
     def parse_error(self):
@@ -63,7 +66,8 @@ class OpenStackResponse(Response):
         #TODO get test fixture and implement error message retrieval from json
         return '%s %s' % (self.status, self.error)
 
-class OpenStackConnection(ConnectionUserAndKey):
+
+class OpenStackConnection(MossoBasedConnection):
     """ Connection class for the OpenStack driver """
     
     responseCls = OpenStackResponse
@@ -71,35 +75,26 @@ class OpenStackConnection(ConnectionUserAndKey):
     def __init__(self, user_name, api_key, url, secure):
         self.server_url = url
         r = urlparse.urlparse(url)
-        self.api_version = r.path # here we rely on structure http://hostname:port/v1.0 so path=path_version
+
+        # here we rely on path structure like
+        # http://hostname:port/v1.0 so path=path_version
+        self.api_version = r.path
         self.auth_token = None
-        super(OpenStackConnection, self).__init__(user_id=user_name, key=api_key, secure=secure, host=r.hostname, port=r.port)
+        super(OpenStackConnection, self).__init__(user_id=user_name,
+                                                  key=api_key,
+                                                  secure=secure,
+                                                  host=r.hostname,
+                                                  port=r.port)
 
     def encode_data(self, data): #TODO implement and parametrise body encoding
         return data
 
-    def request(self, action, params=None, data='', headers=None, method='GET', raw=False):
-
-        if not self.auth_token:#TODO deal with token expiration
-            self._auth()
-        
-        if not headers:
-            headers = {}
-        if not params:
-            params = {}
-        action = self.server_url + action
+    def _set_additional_headers(self, action, params, data, headers, method):
         if method in ("POST", "PUT"):
-            headers = {'Content-Type': 'application/json'}#TODO parametrise Content-Type
-            #TODO check what about token cache-expire in OS
-        return super(OpenStackConnection, self).request(
-            action=action,
-            params=params, data=data,
-            method=method, headers=headers
-        )
+            headers['Content-Type'] = 'application/json'
 
     def add_default_headers(self, headers):
         headers['X-Auth-Token'] = self.auth_token
-        #TODO add parametrised accept
         headers['Accept'] = 'application/json'
         return headers
 
@@ -124,8 +119,9 @@ class OpenStackConnection(ConnectionUserAndKey):
             self.auth_token = headers['x-auth-token']
         except KeyError:
             raise InvalidCredsError()
-        
-class OpenStackNodeDriver(NodeDriver):
+
+
+class OpenStackNodeDriver(MossoBasedNodeDriver):
     """ OpenStack node driver. """
     connectionCls = OpenStackConnection
     name = 'OpenStack'
@@ -140,8 +136,8 @@ class OpenStackNodeDriver(NodeDriver):
                        'QUEUE_RESIZE': NodeState.PENDING,
                        'PREP_RESIZE': NodeState.PENDING,
                        'VERIFY_RESIZE': NodeState.RUNNING,
-                       'RESIZE': NodeState.PENDING,
                        'PASSWORD': NodeState.PENDING,
+                       'RESIZE': NodeState.PENDING,
                        'RESCUE': NodeState.PENDING,
                        'REBOOT': NodeState.REBOOTING,
                        'HARD_REBOOT': NodeState.REBOOTING,
@@ -162,25 +158,30 @@ class OpenStackNodeDriver(NodeDriver):
         @keyword    secure: use HTTPS or HTTP. Note: currently only HTTP
         @type       secure: bool
         """
-        self.connection = OpenStackConnection(user_name=user_name, api_key=api_key, url=url, secure= secure)
+        self.connection = OpenStackConnection(user_name=user_name,
+                                              api_key=api_key,
+                                              url=url, secure= secure)
         self.connection.driver = self
         self.connection.connect()
 
     def list_locations(self):
-        """Lists available locations. So far there is no public locations so we return fake location """
-        return [NodeLocation(id=0, name='OpenStack is private cloud', country='NoCountry', driver=self)]
+        """Lists available locations. So far there is no public locations
+        so we return fake location
+        """
 
-    def list_sizes(self, location=None):
-        flavors_dict = self.connection.request('/flavors/detail').object
-        try:
-            flavors = flavors_dict['flavors']
-            values = flavors
-        except KeyError:
-            raise MalformedResponseError(value='no flavors-values clause', body=flavors_dict, driver=self)
-        return [ self._to_size(value) for value in values ]
+        return [NodeLocation(id=0, name='OpenStack is private cloud',
+                             country='NoCountry', driver=self)]
 
     def ex_list_flavors(self):
         self.list_sizes()
+
+    def _to_sizes(self, flavors_dict):
+        try:
+            flavors = flavors_dict['flavors']
+        except KeyError:
+            raise MalformedResponseError(value='no flavors-values clause',
+                                         body=flavors_dict, driver=self)
+        return [ self._to_size(value) for value in flavors ]
 
     def _to_size(self, el):
         s = OpenstackNodeSize(id=el.get('id'),
@@ -193,29 +194,32 @@ class OpenStackNodeDriver(NodeDriver):
                      links=el.get('links'))
         return s
     
-    def list_images(self, location=None):
-        images_dict = self.connection.request('/images/detail').object
+    def _to_images(self, images_dict):
         try:
             images = images_dict['images']
         except KeyError:
-            raise MalformedResponseError(value='no images clause', body=images_dict, driver=self)
-        return [ self._to_image(image) for image in images if image.get('status') == 'ACTIVE' ]
+            raise MalformedResponseError(value='no images clause',
+                                         body=images_dict, driver=self)
+        #filter out all inactive images, since there's no way to tell client image is not ok
+        return [ self._to_image(image)
+                 for image in images if image.get('status') == 'ACTIVE' ]
 
     def _to_image(self, el):
-        i = NodeImage(id=el.get('id'),
-                     name=el.get('name'),
-                     driver=self.connection.driver,
-                     extra={'updated': el.get('updated'), 'links': el.get('links')})
-        return i
+        image = NodeImage(id=el.get('id'),
+                          name=el.get('name'),
+                          driver=self.connection.driver,
+                          extra={'updated': el.get('updated'),
+                                 'links': el.get('links')}
+        )
+        return image
 
-    def list_nodes(self):
-        servers_dict = self.connection.request('/servers/detail').object
+    def _to_nodes(self, servers_dict):
         try:
             servers = servers_dict['servers']
-            values = servers
         except KeyError:
-            raise MalformedResponseError(value='in list_nodes: no servers-values clause', body=servers_dict, driver=self)
-        return [ self._to_node(value) for value in values ]
+            raise MalformedResponseError(value='no servers-values clause',
+                                         body=servers_dict, driver=self)
+        return [ self._to_node(server) for server in servers ]
 
     def ex_list_servers(self):
         self.list_nodes()
@@ -238,27 +242,33 @@ class OpenStackNodeDriver(NodeDriver):
 
         flavorRef = node_size.links[0]['href']
         imageRef = node_image.extra['links'][0]['href']
-        request = {'server': {'name': name, 'flavorRef': flavorRef, 'imageRef': imageRef}}
+        request = {'server': {'name': name, 'flavorRef': flavorRef,
+                              'imageRef': imageRef}}
         if ex_metadata:
-            request['server']['metadata']=ex_metadata
+            request['server']['metadata'] = ex_metadata
         if ex_personality:
-            request['server']['personality']=ex_personality
+            request['server']['personality'] = ex_personality
 
-        data=json.dumps(request)
+        data = json.dumps(request)
         resp = self.connection.request("/servers", method='POST', data=data)
         try:
             server_dict = resp.object['server']
         except KeyError:
-            raise MalformedResponseError(value='no server clause', body=resp.object, driver=self)
+            raise MalformedResponseError(value='no server clause',
+                                         body=resp.object, driver=self)
         return self._to_node(server_dict=server_dict)
 
     def _to_node(self, server_dict):
-        """ Here we expect a dictionary which is under the clause server or servers in /servers or /servers/detail """
+        """ Here we expect a dictionary which is under the clause server
+        or servers in /servers or /servers/detail
+        """
+
         ips = OpenStackIps(server_dict['addresses'])
 
         n = Node(id=server_dict.get('id'),
                  name=server_dict.get('name'),
-                 state=self.NODE_STATE_MAP.get(server_dict.get('status'), NodeState.UNKNOWN),
+                 state=self.NODE_STATE_MAP.get(server_dict.get('status'),
+                                               NodeState.UNKNOWN),
                  public_ip=ips.public_ipv4, #list of addresses
                  private_ip=ips.private_ipv4, #list of addresses
                  driver=self.connection.driver,
@@ -276,71 +286,55 @@ class OpenStackNodeDriver(NodeDriver):
                  })
         return n
 
-    def destroy_node(self, node):
-        uri = '/servers/%s' % node.id
-        resp = self.connection.request(uri, method='DELETE')
-        return OpenStackResponse.is_success(resp.status)
-
-    def reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='HARD')
-
-    def ex_soft_reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='SOFT')
-
-    def ex_hard_reboot_node(self, node):
-        return self._reboot_node(node, reboot_type='HARD')
-        
-    def _reboot_node(self, node, reboot_type):
-        resp = self._node_action(node, json.dumps({'reboot': {'type': reboot_type}}))
+    def ex_rebuild(self, node_id, image_ref):
+        body = {"rebuild" : {"imageRef" : image_ref}}
+        resp = self._node_action(node_id, body=body)
         return resp.status == 202
 
     def _node_action(self, node, body):
-        uri = '/servers/%s/action' % node.id
-        resp = self.connection.request(uri, method='POST', data=body)
-        return resp
-
-    def ex_rebuild(self, node_id, image_id): #TODO support real data
-        resp = self.connection.request("/servers/%s/action" % node_id,
-                                       method='POST',
-                                       data='')
-        return resp.status == 202
-
-    def ex_get_node_details(self, node_id):
-        uri = '/servers/%s' % node_id
-        resp = self.connection.request(uri, method='GET')
-        if resp.status == 404:
-            return None
-        return self._to_node(resp.object)
+        return super(OpenStackNodeDriver, self)._node_action(node,
+                                                             json.dumps(body))
 
     def ex_limits(self):
         resp = self.connection.request('/limits', method='GET')
         return resp.object['limits']
 
+
 class OpenStackIps(object):
     """
         Contains the list of public and private IPs
-        @keyword    ip_list: IPs with the structure C{dict} {'values'}: [{'version':4, 'addr':''}, ], 'id' : 'public'}
+        @keyword    ip_list: IPs with the structure C{dict} {'values'}:
+                        [{'version':4, 'addr':''}, ], 'id' : 'public'}
         @type       ip_list: C{list}
     """
+
     public_ipv4 = []
     private_ipv4 = []
     public_ipv6 = []
     private_ipv6 = []
     def __init__(self, ip_list):
-        self._separate_by_protocol(ip_list['public'], self.public_ipv4, self.public_ipv6)
-        self._separate_by_protocol(ip_list['private'], self.private_ipv4, self.private_ipv6)
+        self._separate_by_protocol(ip_list['public'],
+                                   self.public_ipv4, self.public_ipv6)
+        self._separate_by_protocol(ip_list['private'],
+                                   self.private_ipv4, self.private_ipv6)
 
     def _separate_by_protocol(self, input_list, out_list_v4, out_list_v6):
-        """ convert IP dictionary to tuple of the structure """
+        """
+        convert IP dictionary to list of the structure,
+        note that out_list_v4 and out_list_v6 are modified
+        """
+
         for ip in input_list:
             if ip['version'] == 4:
                 out_list_v4.append(ip['addr'])
             if ip['version'] == 6:
                 out_list_v6.append(ip['addr'])
 
+
 class OpenstackNodeSize(NodeSize):
     """ extends base NodeSize with links section """
     links = []
     def __init__(self, id, name, ram, disk, bandwidth, price, driver, links):
-        super(OpenstackNodeSize, self).__init__(id, name, ram, disk, bandwidth, price, driver)
+        super(OpenstackNodeSize, self).__init__(id, name, ram, disk,
+                                                bandwidth, price, driver)
         self.links = links

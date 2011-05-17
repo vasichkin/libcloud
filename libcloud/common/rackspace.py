@@ -30,30 +30,25 @@ __all__ = [
     "AUTH_HOST_US",
     "AUTH_HOST_UK"
     ]
+
 class RackspaceBaseConnection(ConnectionUserAndKey):
-    def __init__(self, user_id, key, secure):
+    def __init__(self, user_id, key, secure, host=None, port=None):
         self.cdn_management_url = None
         self.storage_url = None
         self.auth_token = None
         self.request_path = None
-        self.__host = None
+        self.__host = host
         super(RackspaceBaseConnection, self).__init__(
-            user_id, key, secure=secure)
+            user_id, key, secure=secure, host=host, port=port)
 
     def add_default_headers(self, headers):
         headers['X-Auth-Token'] = self.auth_token
-        headers['Accept'] = self.accept_format
+        headers['Accept'] = "application/xml"
         return headers
 
-    @property
-    def host(self):
-        """
-        Rackspace uses a separate host for API calls which is only provided
-        after an initial authentication request. If we haven't made that
-        request yet, do it here. Otherwise, just return the management host.
-        """
-        if not self.__host:
-            # Initial connection used for authentication
+    def _auth(self):
+        conn = None
+        try:
             conn = self.conn_classes[self.secure](
                 self.auth_host, self.port[self.secure])
             conn.request(
@@ -86,6 +81,48 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
             # Set host to where we want to make further requests to;
             self.__host = server
-            conn.close()
+        finally:
+            if conn:
+                conn.close()
+
+    def request(self, action, params=None, data='', headers=None,
+                method='GET', raw=False):
+
+        if not self.auth_token:
+            self._auth()
+
+        attempt = 0
+        response = None
+        
+        while attempt < 2:
+            response = super(RackspaceBaseConnection, self).request(
+                action=action,
+                params=params, data=data,
+                method=method, headers=headers
+            )
+
+            if response.status != 401:
+                return response
+            else:
+                #auth token expired, need to refresh it and retry once
+                attempt += 1
+                self._auth()
+
+        return response
+
+    def _get_host(self):
+        """
+        Getter for host property - since it's taken from auth endpoint
+        we have to take authentication first
+        """
+
+        if not self.__host:
+            self._auth()
 
         return self.__host
+
+    def _set_host(self, host):
+        self.__host = host
+
+
+    host = property(_get_host, _set_host)

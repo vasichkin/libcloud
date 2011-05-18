@@ -35,14 +35,10 @@ from libcloud.common.rackspace import (
 NAMESPACE='http://docs.rackspacecloud.com/servers/api/v1.0'
 
 class MossoBasedResponse(Response):
-    @staticmethod
-    def is_success(status):
-        """ does this status stands for success """
-        i = int(status)
-        return i >= 200 and i <= 299
 
     def success(self):
-        return self.is_success(self.status)
+        status = int(self.status)
+        return status >= 200 and status <= 299
 
 
 class MossoBasedConnection(RackspaceBaseConnection):
@@ -113,7 +109,7 @@ class MossoBasedNodeDriver(NodeDriver):
     def destroy_node(self, node):
         uri = '/servers/%s' % node.id
         resp = self.connection.request(uri, method='DELETE')
-        return self.connection.responseCls.is_success(resp.status)
+        return resp.status in (202, 204)
 
     def ex_get_node_details(self, node_id):
         uri = '/servers/%s' % node_id

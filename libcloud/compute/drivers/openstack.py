@@ -29,26 +29,7 @@ from libcloud.compute.drivers.rackspace import MossoBasedConnection
 
 
 class OpenStackResponse(MossoBasedResponse):
-
-    @staticmethod
-    def is_success(status):
-        """
-         GET /servers /servers/detail code 200 203
-         POST /servers code 202
-         GET /servers/id code 200 203
-         
-         GET /servers/id/ips coe 200 203
-         GET /servers/id/ips/networkID code 200 203
-
-         GET /flavors /flavors/detail code 200 203
-         GET /flavors/id code 200 203
-
-         GET /images /images/detail code 202 203
-         POST /images/id code 202
-         GET /images/id code 200, 203
-         DELETE /images/id code 204
-        """
-        return int(status) in (200, 202, 203, 204)
+    """ OpenStack specific response """
 
     def parse_body(self):
         if not self.body:

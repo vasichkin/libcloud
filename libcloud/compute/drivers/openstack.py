@@ -78,29 +78,6 @@ class OpenStackConnection(MossoBasedConnection):
         headers['Accept'] = 'application/json'
         return headers
 
-    def _auth(self):
-        """ OpenStack needs first to get an authentication token """
-        
-        self.connection.request(
-            method='GET',
-            url=self.api_version,
-            headers={'X-Auth-User': self.user_id, 'X-Auth-Key': self.key}
-        )
-
-        resp = self.connection.getresponse()
-
-        if resp.status != httplib.NO_CONTENT:
-            raise InvalidCredsError()
-
-        headers = dict(resp.getheaders())
-
-        try:
-            self.server_url = headers['x-server-management-url']
-            self.auth_token = headers['x-auth-token']
-        except KeyError:
-            raise InvalidCredsError()
-
-
 class OpenStackNodeDriver(MossoBasedNodeDriver):
     """ OpenStack node driver. """
     connectionCls = OpenStackConnection

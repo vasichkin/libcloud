@@ -100,8 +100,10 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
                 try:
                     self.server_url = headers['x-server-management-url']
-                    self.storage_url = headers['x-storage-url']
-                    self.cdn_management_url = headers['x-cdn-management-url']
+                    if 'x-storage-url' in headers:
+                        self.storage_url = headers['x-storage-url']
+                    if 'x-cdn-management-url' in headers:
+                        self.cdn_management_url = headers['x-cdn-management-url']
                     self.lb_url = self.server_url.replace("servers", "ord.loadbalancers")
                     self.auth_token = headers['x-auth-token']
                 except KeyError, e:

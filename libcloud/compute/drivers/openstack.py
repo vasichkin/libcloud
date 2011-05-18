@@ -44,7 +44,6 @@ class OpenStackResponse(MossoBasedResponse):
 
     def parse_error(self):
         """Used in to form message for exception to raise in case self.status is not OK"""
-        #TODO get test fixture and implement error message retrieval from json
         return '%s %s' % (self.status, self.error)
 
 
@@ -67,7 +66,7 @@ class OpenStackConnection(MossoBasedConnection):
                                                   host=r.hostname,
                                                   port=r.port)
 
-    def encode_data(self, data): #TODO implement and parametrise body encoding
+    def encode_data(self, data):
         return data
 
     def _set_additional_headers(self, action, params, data, headers, method):
@@ -84,7 +83,7 @@ class OpenStackConnection(MossoBasedConnection):
         
         self.connection.request(
             method='GET',
-            url=self.api_version,#TODO get version from access point directly?
+            url=self.api_version,
             headers={'X-Auth-User': self.user_id, 'X-Auth-Key': self.key}
         )
 
@@ -127,18 +126,12 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
 
     def __init__(self, user_name, api_key, url, secure=False):
         """
-        @keyword    user_name:    NOVA_USERNAME as reported by OpenStack
-        @type       user_name:    str
-
-        @keyword    api_key: NOVA_API_KEY as reported by OpenStack
-        @type       api_key: str
-
-        @keyword    url: NOVA_URL as reported by OpenStack.
-        @type       url: str
-
-        @keyword    secure: use HTTPS or HTTP. Note: currently only HTTP
-        @type       secure: bool
+        user_name NOVA_USERNAME as reported by OpenStack
+        api_key NOVA_API_KEY as reported by OpenStack
+        url NOVA_URL as reported by OpenStack.
+        secure use HTTPS or HTTP. Note: currently only HTTP
         """
+
         self.connection = OpenStackConnection(user_name=user_name,
                                               api_key=api_key,
                                               url=url, secure= secure)
@@ -208,12 +201,9 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
     def create_node(self, **kwargs):
         """Create a new node
 
-        See L{NodeDriver.create_node} for more keyword args.
-        @keyword    ex_metadata: Key/Value metadata to associate with a node
-        @type       ex_metadata: C{dict}
-
-        @keyword    ex_files:   List of personalities => File contents to create on the node
-        @type       ex_files:   C{dict}
+        See L{NodeDriver.create_node} for more keyword args, some of them:
+            ex_metadata: dict of Key/Value metadata to associate with a node
+            ex_files: dict {filename: content} to be injected to VM
         """
         name = kwargs['name']
         node_image = kwargs['image']
@@ -282,12 +272,7 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
 
 
 class OpenStackIps(object):
-    """
-        Contains the list of public and private IPs
-        @keyword    ip_list: IPs with the structure C{dict} {'values'}:
-                        [{'version':4, 'addr':''}, ], 'id' : 'public'}
-        @type       ip_list: C{list}
-    """
+    """ Contains the list of public and private IPs """
 
     public_ipv4 = []
     private_ipv4 = []

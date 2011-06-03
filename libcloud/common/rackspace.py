@@ -36,7 +36,6 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
         self.cdn_management_url = None
         self.storage_url = None
         self.auth_token = None
-        self.request_path = None
         super(RackspaceBaseConnection, self).__init__(
             user_id, key, secure=secure, host=host, port=port)
 
@@ -122,11 +121,13 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
             for key in ['server_url', 'storage_url', 'cdn_management_url',
                         'lb_url']:
-                scheme, server, request_path, param, query, fragment = (
-                    urlparse.urlparse(getattr(self, key)))
-                # Set host to where we want to make further requests to
-                setattr(self, '__%s' % (key), server)
-                setattr(self, '__request_path_%s' % (key), request_path)
+                url = getattr(self, key)
+                if url:
+                    scheme, server, request_path, param, query, fragment = (
+                        urlparse.urlparse(getattr(self, key)))
+                    # Set host to where we want to make further requests to
+                    setattr(self, '__%s' % (key), server)
+                    setattr(self, '__request_path_%s' % (key), request_path)
         finally:
             if conn:
                 conn.close()
@@ -159,5 +160,6 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
     @property
     def host(self):
         # Default to server_host
+        print "@host"
         return self._get_host(url_key=self._url_key)
 

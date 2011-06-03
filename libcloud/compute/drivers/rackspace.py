@@ -49,7 +49,7 @@ class MossoBasedConnection(RackspaceBaseConnection):
 
     def __init__(self, user_id, key, secure, host=None, port=None):
         super(MossoBasedConnection, self).__init__(user_id, key, secure,
-                                                   host, port)
+                                                    host, port)
 
 
     def request(self, action, params=None, data='', headers=None,

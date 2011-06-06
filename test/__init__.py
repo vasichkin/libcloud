@@ -145,6 +145,7 @@ class MockHttp(BaseMockHttpObject):
 
     def request(self, method, url, body=None, headers=None, raw=False):
         # Find a method we can use for this request
+
         parsed = urlparse.urlparse(url)
         scheme, netloc, path, params, query, fragment = parsed
         qs = parse_qs(query)
@@ -153,6 +154,7 @@ class MockHttp(BaseMockHttpObject):
         meth_name = self._get_method_name(type=self.type,
                                           use_param=self.use_param,
                                           qs=qs, path=path)
+
         meth = getattr(self, meth_name)
 
         if self.test and isinstance(self.test, LibcloudTestCase):

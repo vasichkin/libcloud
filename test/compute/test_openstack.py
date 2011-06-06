@@ -19,7 +19,7 @@ import re
 from urllib2 import urlparse
 from libcloud.common.types import InvalidCredsError
 from libcloud.compute.base import NodeImage, Node
-from libcloud.compute.drivers.openstack import OpenStackNodeDriver, OpenstackNodeSize
+from libcloud.compute.drivers.openstack import OpenStackNodeDriver_v1_1, OpenstackNodeSize
 from libcloud.compute.types import NodeState
 from test import MockHttp
 from test.compute import TestCaseMixin
@@ -27,33 +27,22 @@ from test.file_fixtures import ComputeFileFixtures
 
 class OpenStackTests(unittest.TestCase, TestCaseMixin):
     def setUp(self):
-        OpenStackNodeDriver.connectionCls.conn_classes = (OpenStackMockHttp, OpenStackMockHttp)
+        OpenStackNodeDriver_v1_1.connectionCls.conn_classes = (OpenStackMockHttp, OpenStackMockHttp)
         OpenStackMockHttp.type = None
-        self.driver = OpenStackNodeDriver(user_name='TestUser', api_key='TestKey',
-                                          url='http://test.url.faked.auth:3333/v1.1/')
+        self.driver = OpenStackNodeDriver_v1_1(user_name='TestUser', api_key='TestKey',
+                                          url='http://test.url.faked.auth:3333/versions')
         self.driver.list_nodes() # to authorize
 
     def test_auth(self):
         OpenStackMockHttp.type = 'UNAUTHORIZED'
         try:
-            self.driver = OpenStackNodeDriver('TestUser', 'TestKey', 'http://test.url.faked.auth:3333/v1.1/')
+            self.driver = OpenStackNodeDriver_v1_1('TestUser', 'TestKey', 'http://test.url.faked.auth:3333/versions')
             self.driver.list_nodes() # authorization if first request
         except InvalidCredsError, e:
             self.assertEqual(True, isinstance(e, InvalidCredsError))
         else:
             self.fail('test should have thrown')
 
-    def test_auth_missing_key(self):
-        OpenStackMockHttp.type = 'UNAUTHORIZED_MISSING_KEY'
-        try:
-            self.driver = OpenStackNodeDriver('TestUser', 'TestKey', 'http://test.url.faked.auth:3333/v1.1/')
-            self.driver.list_nodes() # authorization if first request
-        except InvalidCredsError, e:
-            self.assertEqual(True, isinstance(e, InvalidCredsError))
-        else:
-            self.fail('test should have thrown')
-
-        #TODO http://docs.openstack.org/bexar/openstack-compute/developer/content/ch03s07.html
 
     def test_list_nodes(self):
         OpenStackMockHttp.type = 'EMPTY'
@@ -207,12 +196,15 @@ class OpenStackTests(unittest.TestCase, TestCaseMixin):
 class OpenStackMockHttp(MockHttp):
     fixtures = ComputeFileFixtures('openstack')
 
+    def _versions(self, method, url, body, headers):
+        body = self.fixtures.load(self._form_fixture_name(method, url, body, headers))
+        return httplib.OK, body, {}, httplib.responses[httplib.OK]
+
+    def _versions_UNAUTHORIZED(self, *args, **kwargs):
+        return self._versions(*args, **kwargs)
+
     def _v1_1_UNAUTHORIZED(self, method, url, body, headers):
         return  httplib.UNAUTHORIZED, "", {}, httplib.responses[httplib.UNAUTHORIZED]
-
-    def _v1_1_UNAUTHORIZED_MISSING_KEY(self, method, url, body, headers):
-        headers = {'x-auth-token': 'FE011C19-CF86-4F87-BE5D-9229145D7A06'}
-        return httplib.NO_CONTENT, "", headers, httplib.responses[httplib.NO_CONTENT]
 
     def _v1_1_servers_detail_EMPTY(self, method, url, body, headers):
         body = self.fixtures.load(self._form_fixture_name(method, url, body, headers, '_empty'))

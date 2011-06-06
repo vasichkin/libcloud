@@ -55,7 +55,8 @@ def main():
         return 1
 
     try:
-        open_stack = OpenStackDriver(user_name=nova_user_name, api_key= nova_api_key , url=nova_url)
+        open_stack = OpenStackDriver(version='v1.1', username=nova_user_name,
+                                     api_key=nova_api_key, version_url=nova_url)
         print ">> Loading nodes..."
         nodes = open_stack.list_nodes()
         pprint(nodes)
@@ -71,7 +72,7 @@ def main():
     sizes = open_stack.list_sizes()
     pprint(sizes[:10])
 
-    instance = open_stack.create_node(name='create_image_demo',
+    instance = open_stack.create_node(name='test_server',
                            image=images[0],
                            size=sizes[0])
     #TODO: add check status of instance

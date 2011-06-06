@@ -32,12 +32,19 @@ __all__ = [
     ]
 
 class RackspaceBaseConnection(ConnectionUserAndKey):
-    def __init__(self, user_id, key, secure, host=None, port=None):
+    def __init__(self, user_id, key,
+                 secure, auth_host, auth_port=None, auth_path=None):
         self.cdn_management_url = None
         self.storage_url = None
         self.auth_token = None
+
+        self.secure = secure
+        self.auth_host = auth_host
+        self.auth_port = auth_port or self.port[secure]
+        self.auth_path = auth_path or '/%s' % AUTH_API_VERSION
+
         super(RackspaceBaseConnection, self).__init__(
-            user_id, key, secure=secure, host=host, port=port)
+            user_id, key, secure=secure, host=None, port=None)
 
     def add_default_headers(self, headers):
         headers['X-Auth-Token'] = self.auth_token
@@ -81,10 +88,11 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
         conn = None
         try:
             conn = self.conn_classes[self.secure](
-                self.auth_host, self.port[self.secure])
+                self.auth_host, self.auth_port)
+
             conn.request(
                 method='GET',
-                url='/%s' % (AUTH_API_VERSION),
+                url=self.auth_path,
                 headers={
                     'X-Auth-User': self.user_id,
                     'X-Auth-Key': self.key
@@ -95,21 +103,8 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
             if resp.status == httplib.NO_CONTENT:
                 # HTTP NO CONTENT (204): auth successful
-                headers = dict(resp.getheaders())
+                self._parse_url_headers(dict(resp.getheaders()))
 
-                try:
-                    self.server_url = headers['x-server-management-url']
-                    if 'x-storage-url' in headers:
-                        self.storage_url = headers['x-storage-url']
-                    if 'x-cdn-management-url' in headers:
-                        self.cdn_management_url = headers['x-cdn-management-url']
-                    self.lb_url = self.server_url.replace("servers", "ord.loadbalancers")
-                    self.auth_token = headers['x-auth-token']
-                except KeyError, e:
-                    # Returned 204 but has missing information in the header, something is wrong
-                    raise MalformedResponseError('Malformed response',
-                                                 body='Missing header: %s' % (str(e)),
-                                                 driver=self.driver)
             elif resp.status == httplib.UNAUTHORIZED:
                 # HTTP UNAUTHORIZED (401): auth failed
                 raise InvalidCredsError()
@@ -121,7 +116,7 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
             for key in ['server_url', 'storage_url', 'cdn_management_url',
                         'lb_url']:
-                url = getattr(self, key)
+                url = getattr(self, key, None)
                 if url:
                     scheme, server, request_path, param, query, fragment = (
                         urlparse.urlparse(getattr(self, key)))
@@ -131,6 +126,20 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
         finally:
             if conn:
                 conn.close()
+
+    def _parse_url_headers(self, headers):
+        try:
+            self.server_url = headers['x-server-management-url']
+            self.storage_url = headers['x-storage-url']
+            self.cdn_management_url = headers['x-cdn-management-url']
+            self.lb_url = self.server_url.replace("servers", "ord.loadbalancers")
+            self.auth_token = headers['x-auth-token']
+        except KeyError, e:
+            # Returned 204 but has missing information in the header, something is wrong
+            raise MalformedResponseError('Malformed response',
+                                         body='Missing header: %s' % (str(e)),
+                                         driver=self.driver)
+
 
     def request(self, action, params=None, data='', headers=None,
                 method='GET', raw=False):
@@ -159,7 +168,7 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
     @property
     def host(self):
-        # Default to server_host
         print "@host"
+        # Default to server_host
         return self._get_host(url_key=self._url_key)
 

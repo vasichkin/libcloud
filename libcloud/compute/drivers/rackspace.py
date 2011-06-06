@@ -46,11 +46,10 @@ class MossoBasedConnection(RackspaceBaseConnection):
     Base class for Connection to server management API derived from Mosso:
     OpenStack and RackSpace original one (Mosso itself)
     """
+    _url_key = "server_url"
 
-    def __init__(self, user_id, key, secure, host=None, port=None):
-        super(MossoBasedConnection, self).__init__(user_id, key, secure,
-                                                    host, port)
-
+    def __init__(self, user_id, key, auth_host, secure=True, auth_port=None, auth_path=None):
+        super(MossoBasedConnection, self).__init__(user_id, key, secure, auth_host, auth_port, auth_path)
 
     def request(self, action, params=None, data='', headers=None,
                 method='GET', raw=False):
@@ -187,10 +186,9 @@ class RackspaceConnection(MossoBasedConnection):
 
     responseCls = RackspaceResponse
     auth_host = AUTH_HOST_US
-    _url_key = "server_url"
 
     def __init__(self, user_id, key, secure=True):
-        super(RackspaceConnection, self).__init__(user_id, key, secure)
+        super(RackspaceConnection, self).__init__(user_id, key, RackspaceConnection.auth_host, secure)
         self.api_version = 'v1.0'
 
     def _set_additional_headers(self, action, params, data, headers, method):
@@ -626,13 +624,3 @@ class RackspaceUKNodeDriver(RackspaceNodeDriver):
     def list_locations(self):
         return [NodeLocation(0, 'Rackspace UK London', 'UK', self)]
 
-class OpenStackConnection(RackspaceConnection):
-
-    def __init__(self, user_id, key, secure, host, port):
-        super(OpenStackConnection, self).__init__(user_id, key, secure=secure)
-        self.auth_host = host
-        self.port = (port, port)
-
-class OpenStackNodeDriver(RackspaceNodeDriver):
-    name = 'OpenStack'
-    connectionCls = OpenStackConnection

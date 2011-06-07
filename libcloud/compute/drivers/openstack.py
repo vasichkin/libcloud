@@ -139,7 +139,8 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
     def encode_data(self, data):
         return data
 
-    def _set_additional_headers(self, action, params, data, headers, method):
+    def _set_additional_headers(self, action, method, params, headers, data):
+        print "method %s" % method
         if method in ("POST", "PUT"):
             headers['Content-Type'] = 'application/json'
 

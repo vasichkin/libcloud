@@ -168,7 +168,6 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
 
     @property
     def host(self):
-        print "@host"
         # Default to server_host
         return self._get_host(url_key=self._url_key)
 

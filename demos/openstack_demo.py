@@ -24,6 +24,7 @@
 
 from pprint import pprint
 import traceback
+import re
 
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
@@ -54,9 +55,25 @@ def main():
         print 'Hint define N0VA_API_KEY NOVA_USERNAME NOVA_URL'
         return 1
 
+    if 'NOVA_VERSION' in os.environ:
+        version = os.environ['NOVA_VERSION']
+    else:
+        version = None
+
+
+
     try:
-        open_stack = OpenStackDriver(version='v1.1', username=nova_user_name,
-                                     api_key=nova_api_key, version_url=nova_url)
+        if version=='v1.0':
+            open_stack = OpenStackDriver(version='v1.0', username=nova_user_name,
+                                         api_key=nova_api_key, auth_host=nova_url)
+        else:
+            match = re.match('(http(?:s)?://[^:/]*(?::\d+)?/.*/)v1.[01](?:/)?', nova_url)
+            if match:
+                version_url = match.group(1)
+            else:
+                version_url = nova_url
+            open_stack = OpenStackDriver(version=version, username=nova_user_name,
+                                         api_key=nova_api_key, version_url=version_url)
         print ">> Loading nodes..."
         nodes = open_stack.list_nodes()
         pprint(nodes)

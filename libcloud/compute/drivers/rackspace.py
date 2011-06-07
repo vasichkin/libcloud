@@ -191,7 +191,7 @@ class RackspaceConnection(MossoBasedConnection):
         super(RackspaceConnection, self).__init__(user_id, key, RackspaceConnection.auth_host, secure)
         self.api_version = 'v1.0'
 
-    def _set_additional_headers(self, action, params, data, headers, method):
+    def _set_additional_headers(self, action, method, params, headers, data):
         """ Set driver specific headers for request
         note that headers should be a dict, which is modified """
 

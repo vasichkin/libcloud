@@ -89,10 +89,18 @@ def main():
     sizes = open_stack.list_sizes()
     pprint(sizes[:10])
 
+    print ">> Show limits..."
+    limits = open_stack.ex_limits()
+    pprint(limits)
+
+    print ">> Create a server..."
+
     instance = open_stack.create_node(name='test_server',
                            image=images[0],
                            size=sizes[0])
     #TODO: add check status of instance
+
+    print ">> Delete the server..."
     instance.destroy()
     return 0
 

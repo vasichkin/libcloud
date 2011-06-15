@@ -110,6 +110,11 @@ class MossoBasedNodeDriver(NodeDriver):
         resp = self.connection.request(uri, method='DELETE')
         return resp.status in (202, 204)
 
+    def ex_destroy_image(self, image):
+        uri = '/images/%s' % image.id
+        resp = self.connection.request(uri, method='DELETE')
+        return resp.status in (202, 204)
+
     def ex_get_node_details(self, node_id):
         uri = '/servers/%s' % node_id
         resp = self.connection.request(uri, method='GET')

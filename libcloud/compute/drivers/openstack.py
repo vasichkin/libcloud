@@ -36,6 +36,8 @@ class OpenStackJsonResponse(MossoBasedResponse):
     def parse_body(self):
         if not self.body:
             return None
+        if self.status in (202, 204):
+            return self.body
         try:
             body = json.loads(self.body)
         except:
@@ -140,7 +142,6 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
         return data
 
     def _set_additional_headers(self, action, method, params, headers, data):
-        print "method %s" % method
         if method in ("POST", "PUT"):
             headers['Content-Type'] = 'application/json'
 
@@ -285,6 +286,8 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
         or servers in /servers or /servers/detail
         """
 
+        if 'server' in server_dict:
+            server_dict = server_dict['server']
         ips = OpenStackIps(server_dict['addresses'])
 
         n = Node(id=server_dict.get('id'),
@@ -312,6 +315,12 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
         body = {"rebuild" : {"imageRef" : image_ref}}
         resp = self._node_action(node_id, body=body)
         return resp.status == 202
+
+    def ex_get_image_details(self, image_id):
+        return self._to_image(self.connection.request('/images/%s' % image_id).object)
+
+    def ex_get_size_details(self, size_id):
+        return self._to_size(self.connection.request('/flavors/%s' % size_id).object)
 
     def _node_action(self, node, body):
         return super(OpenStackNodeDriver_v1_1, self)._node_action(node,

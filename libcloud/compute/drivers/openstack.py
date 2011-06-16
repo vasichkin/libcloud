@@ -48,7 +48,7 @@ class OpenStackJsonResponse(MossoBasedResponse):
 
     def parse_error(self):
         """Used in to form message for exception to raise in case self.status is not OK"""
-        return '%s %s' % (self.status, self.error)
+        return '%s %s' % (self.status, self.error), self.status
 
 
 def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,

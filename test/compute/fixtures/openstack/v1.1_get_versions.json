@@ -1,0 +1,22 @@
+{"versions": [
+    {
+        "status": "CURRENT",
+        "id": "v1.1",
+        "links": [
+            {
+                "href": "http://test.url.faked:4444/v1.1",
+                "rel": "self"
+            }
+        ]
+    },
+    {
+        "status": "DEPRECATED",
+        "id": "v1.0",
+        "links": [
+            {
+                "href": "http://test.url.faked:4444/v1.0",
+                "rel": "self"
+            }
+        ]
+    }
+]}

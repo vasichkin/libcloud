@@ -32,6 +32,7 @@ __all__ = [
     ]
 
 class RackspaceBaseConnection(ConnectionUserAndKey):
+
     def __init__(self, user_id, key,
                  secure, auth_host, auth_port=None, auth_path=None):
         self.cdn_management_url = None
@@ -170,4 +171,3 @@ class RackspaceBaseConnection(ConnectionUserAndKey):
     def host(self):
         # Default to server_host
         return self._get_host(url_key=self._url_key)
-

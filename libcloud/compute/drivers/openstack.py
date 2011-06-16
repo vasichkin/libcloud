@@ -138,6 +138,25 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
                                          driver=self.driver)
 
 
+class OpenStackConnection(MossoBasedConnection):
+    """ Connection class for the OpenStack driver """
+    
+    responseCls = OpenStackResponse
+
+    def __init__(self, user_name, api_key, url, secure):
+        self.server_url = url
+        r = urlparse.urlparse(url)
+
+        # here we rely on path structure like
+        # http://hostname:port/v1.0 so path=path_version
+        self.api_version = r.path
+        self.auth_token = None
+        super(OpenStackConnection, self).__init__(user_id=user_name,
+                                                  key=api_key,
+                                                  secure=secure,
+                                                  host=r.hostname,
+                                                  port=r.port)
+
     def encode_data(self, data):
         return data
 
@@ -153,6 +172,30 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
 class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
     """ OpenStack node driver. """
     connectionCls = OpenStackConnection_v1_1
+
+    def _auth(self):
+        """ OpenStack needs first to get an authentication token """
+        
+        self.connection.request(
+            method='GET',
+            url=self.api_version,
+            headers={'X-Auth-User': self.user_id, 'X-Auth-Key': self.key}
+        )
+
+        resp = self.connection.getresponse()
+
+        if resp.status != httplib.NO_CONTENT:
+            raise InvalidCredsError()
+
+        headers = dict(resp.getheaders())
+
+        try:
+            self.server_url = headers['x-server-management-url']
+            self.auth_token = headers['x-auth-token']
+        except KeyError:
+            raise InvalidCredsError()
+
+
     name = 'OpenStack'
     type = Provider.OPENSTACK
 
@@ -288,6 +331,7 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
 
         if 'server' in server_dict:
             server_dict = server_dict['server']
+
         ips = OpenStackIps(server_dict['addresses'])
 
         n = Node(id=server_dict.get('id'),
@@ -324,7 +368,7 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
 
     def _node_action(self, node, body):
         return super(OpenStackNodeDriver_v1_1, self)._node_action(node,
-                                                             json.dumps(body))
+                                                                  json.dumps(body))
 
     def ex_limits(self):
         resp = self.connection.request('/limits', method='GET')

@@ -15,61 +15,130 @@
 
 """ OpenStack driver """
 
-import httplib
-import json
 import urlparse
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
-from libcloud.common.types import MalformedResponseError, InvalidCredsError
+from libcloud.common.types import MalformedResponseError
 from libcloud.compute.types import NodeState, Provider
 from libcloud.compute.base import Node, NodeLocation
 from libcloud.compute.base import NodeSize, NodeImage
-from libcloud.compute.drivers.rackspace import MossoBasedNodeDriver
-from libcloud.compute.drivers.rackspace import MossoBasedResponse
+from libcloud.compute.drivers.rackspace import MossoBasedNodeDriver, RackspaceNodeDriver
+from libcloud.compute.drivers.rackspace import MossoBasedResponse, RackspaceConnection
 from libcloud.compute.drivers.rackspace import MossoBasedConnection
 
 
-class OpenStackResponse(MossoBasedResponse):
+class OpenStackJsonResponse(MossoBasedResponse):
     """ OpenStack specific response """
 
     def parse_body(self):
         if not self.body:
             return None
+        if self.status in (202, 204):
+            return self.body
         try:
             body = json.loads(self.body)
         except:
             raise MalformedResponseError("Failed to parse JSON",
                                          body=self.body,
-                                         driver=OpenStackNodeDriver)
+                                         driver=OpenStackNodeDriver_v1_1)
         return body
 
     def parse_error(self):
         """Used in to form message for exception to raise in case self.status is not OK"""
-        return '%s %s' % (self.status, self.error)
+        return '%s %s' % (self.status, self.error), self.status
 
 
-class OpenStackConnection(MossoBasedConnection):
+def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,
+                        auth_port=None, version_url=None):
+    """ A helper function to instantiate driver of desired type, depending on which openstack
+    API version is used
+
+    version - which API version to use, set to v1.0 to use older RackSpace based xml API. Set to v1.1+
+              to use newer JSON-based API. If None Version API is requested and CURRENT is used.
+    username - user name
+    api_key - API access api key
+    secure - is for v1.0 only, if connection SSL, in 1.1 it is determined with auth info
+    auth_host and auth_port - hostname and port of auth URL for 1.0 only
+    version_url - For 1.1+ only. URL of version list API call
+    """
+    if version == 'v1.0':
+        return OpenStackNodeDriver_v1_0(username, api_key, secure, host=auth_host, port=auth_port)
+    else:
+        return OpenStackNodeDriver_v1_1(username, api_key, url=version_url, version=version)
+
+
+class OpenStackConnection_v1_0(RackspaceConnection):
+
+    def __init__(self, user_id, key, secure, host, port):
+        super(OpenStackConnection_v1_0, self).__init__(user_id, key, secure=secure)
+        self.auth_host = host
+        self.port = (port, port)
+
+class OpenStackNodeDriver_v1_0(RackspaceNodeDriver):
+    name = 'OpenStack'
+    connectionCls = OpenStackConnection_v1_0
+
+class OpenStackConnection_v1_1(MossoBasedConnection):
     """ Connection class for the OpenStack driver """
-    
-    responseCls = OpenStackResponse
 
-    def __init__(self, user_name, api_key, url, secure):
-        self.server_url = url
-        r = urlparse.urlparse(url)
+    responseCls = OpenStackJsonResponse
 
-        # here we rely on path structure like
-        # http://hostname:port/v1.0 so path=path_version
-        self.api_version = r.path
-        self.auth_token = None
-        super(OpenStackConnection, self).__init__(user_id=user_name,
-                                                  key=api_key,
-                                                  secure=secure,
-                                                  host=r.hostname,
-                                                  port=r.port)
+    def __init__(self, user_name, api_key, url, secure, version=None):
+        auth_endpoint, self.version = self._request_auth_endpoint(url, version)
 
-    def encode_data(self, data):
-        return data
+        auth_endpoint = urlparse.urlparse(auth_endpoint)
+        auth_host = auth_endpoint.hostname
+        auth_port = auth_endpoint.port
+        auth_path = auth_endpoint.path
 
-    def _set_additional_headers(self, action, params, data, headers, method):
+        secure = auth_endpoint.scheme == 'https'
+
+        super(OpenStackConnection_v1_1, self).__init__(user_name, api_key, auth_host, secure, auth_port, auth_path)
+
+    def _request_auth_endpoint(self, url, version):
+        conn = None
+        try:
+            endpoint = urlparse.urlparse(url)
+
+            conn = self.conn_classes[endpoint.scheme == 'https'](endpoint.hostname, endpoint.port)
+            conn.request(method='GET', url=endpoint.path, headers={'Accept': 'application/json'})
+
+            response = self.responseCls(conn.getresponse())
+
+            body = response.parse_body()
+
+            # currently API version is described as
+            #    {"status": "CURRENT", "id": "v1.1", "links": [{"href": "http://localhost:8774/v1.1", "rel": "self"}]}
+            for api in body['versions']:
+                if not version and api['status'] == 'CURRENT' or api['id'] == version:
+                    return api['links'][0]['href'], api['id']
+
+            raise Exception('No openstack API version %s at %s' % (version, url))
+#        except AttributeError:
+#            raise MalformedResponseError('Malformed version response %s', body)
+        finally:
+            if conn:
+                conn.close()
+
+    def _parse_url_headers(self, headers):
+        try:
+            server_url = headers['x-server-management-url']
+
+            #due to bug in openstack it always redirect to v1.0
+            self.server_url = server_url.replace('v1.1', self.version)
+
+            self.auth_token = headers['x-auth-token']
+        except KeyError, e:
+            # Returned 204 but has missing information in the header, something is wrong
+            raise MalformedResponseError('Malformed response',
+                                         body='Missing header: %s' % (str(e)),
+                                         driver=self.driver)
+
+
+    def _set_additional_headers(self, action, method, params, headers, data):
         if method in ("POST", "PUT"):
             headers['Content-Type'] = 'application/json'
 
@@ -77,6 +146,10 @@ class OpenStackConnection(MossoBasedConnection):
         headers['X-Auth-Token'] = self.auth_token
         headers['Accept'] = 'application/json'
         return headers
+
+class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
+    """ OpenStack node driver. """
+    connectionCls = OpenStackConnection_v1_1
 
     def _auth(self):
         """ OpenStack needs first to get an authentication token """
@@ -101,9 +174,6 @@ class OpenStackConnection(MossoBasedConnection):
             raise InvalidCredsError()
 
 
-class OpenStackNodeDriver(MossoBasedNodeDriver):
-    """ OpenStack node driver. """
-    connectionCls = OpenStackConnection
     name = 'OpenStack'
     type = Provider.OPENSTACK
 
@@ -124,17 +194,20 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
                        'DELETE_IP': NodeState.PENDING,
                        'UNKNOWN': NodeState.UNKNOWN}
 
-    def __init__(self, user_name, api_key, url, secure=False):
+    def __init__(self, user_name, api_key, url, secure=False, version=None):
         """
         user_name NOVA_USERNAME as reported by OpenStack
         api_key NOVA_API_KEY as reported by OpenStack
         url NOVA_URL as reported by OpenStack.
         secure use HTTPS or HTTP. Note: currently only HTTP
+        version - which API version to use
         """
 
-        self.connection = OpenStackConnection(user_name=user_name,
+        self.connection = OpenStackConnection_v1_1(user_name=user_name,
                                               api_key=api_key,
-                                              url=url, secure= secure)
+                                              url=url,
+                                              secure=secure,
+                                              version=version)
         self.connection.driver = self
         self.connection.connect()
 
@@ -234,6 +307,9 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
         or servers in /servers or /servers/detail
         """
 
+        if 'server' in server_dict:
+            server_dict = server_dict['server']
+
         ips = OpenStackIps(server_dict['addresses'])
 
         n = Node(id=server_dict.get('id'),
@@ -262,9 +338,15 @@ class OpenStackNodeDriver(MossoBasedNodeDriver):
         resp = self._node_action(node_id, body=body)
         return resp.status == 202
 
+    def ex_get_image_details(self, image_id):
+        return self._to_image(self.connection.request('/images/%s' % image_id).object)
+
+    def ex_get_size_details(self, size_id):
+        return self._to_size(self.connection.request('/flavors/%s' % size_id).object)
+
     def _node_action(self, node, body):
-        return super(OpenStackNodeDriver, self)._node_action(node,
-                                                             json.dumps(body))
+        return super(OpenStackNodeDriver_v1_1, self)._node_action(node,
+                                                                  json.dumps(body))
 
     def ex_limits(self):
         resp = self.connection.request('/limits', method='GET')

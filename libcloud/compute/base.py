@@ -471,6 +471,10 @@ class NodeDriver(object):
         @keyword    ssh_port: Optional SSH server port (default is 22)
         @type       ssh_port: C{int}
 
+        @keyword    ssh_timeout: Optional SSH connection timeout in seconds
+                                 (default is None)
+        @type       ssh_timeout: C{float}
+
         See L{NodeDriver.create_node} for more keyword args.
 
         >>> from libcloud.compute.drivers.dummy import DummyNodeDriver
@@ -537,33 +541,34 @@ class NodeDriver(object):
 
                     ssh_username = kwargs.get('ssh_username', 'root')
                     ssh_port = kwargs.get('ssh_port', 22)
+                    ssh_timeout = kwargs.get('ssh_timeout', 20)
 
                     client = SSHClient(hostname=node.public_ip[0],
                                        port=ssh_port, username=ssh_username,
-                                       password=password)
-                    laste = None
+                                       password=password,
+                                       timeout=ssh_timeout)
+
                     while time.time() < end:
-                        laste = None
                         try:
                             client.connect()
-                            break
                         except (IOError, socket.gaierror, socket.error), e:
-                            laste = e
+                            # Retry if a connection is refused or timeout
+                            # occured
+                            client.close()
                             time.sleep(WAIT_PERIOD)
-                            if laste is not None:
-                                raise e
+                            continue
 
-                            tries = 3
-                            while tries >= 0:
-                                try:
-                                    n = kwargs["deploy"].run(node, client)
-                                    client.close()
-                                    break
-                                except Exception, e:
-                                    tries -= 1
-                                    if tries == 0:
-                                        raise
-                                    client.connect()
+                        max_tries, tries = 3, 0
+                        while tries < max_tries:
+                            try:
+                                n = kwargs["deploy"].run(node, client)
+                                client.close()
+                                raise
+                            except Exception, e:
+                                tries += 1
+                                if tries >= max_tries:
+                                    raise DeploymentError(node,
+                                          'Failed after %d tries' % (max_tries))
 
         except DeploymentError:
             raise

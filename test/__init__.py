@@ -12,12 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import httplib
 import random
+import unittest
 
 from cStringIO import StringIO
 from urllib2 import urlparse
 from cgi import parse_qs
+
+class LibcloudTestCase(unittest.TestCase):
+    def __init__(self, *args, **kwargs):
+        self._visited_urls = []
+        self._executed_mock_methods = []
+        super(LibcloudTestCase, self).__init__(*args, **kwargs)
+
+    def setUp(self):
+        self._visited_urls = []
+        self._executed_mock_methods = []
+
+    def _add_visited_url(self, url):
+        self._visited_urls.append(url)
+
+    def _add_executed_mock_method(self, method_name):
+        self._executed_mock_methods.append(method_name)
+
+    def assertExecutedMethodCount(self, expected):
+        print self._executed_mock_methods
+        actual = len(self._executed_mock_methods)
+        self.assertEqual(actual, expected,
+                         'expected %d, but %d mock methods were executed'
+                         % (expected, actual))
 
 class multipleresponse(object):
     """
@@ -112,12 +137,15 @@ class MockHttp(BaseMockHttpObject):
     type = None
     use_param = None # will use this param to namespace the request function
 
+    test = None # TestCase instance which is using this mock
+
     def __init__(self, host, port, *args, **kwargs):
         self.host = host
         self.port = port
 
     def request(self, method, url, body=None, headers=None, raw=False):
         # Find a method we can use for this request
+
         parsed = urlparse.urlparse(url)
         scheme, netloc, path, params, query, fragment = parsed
         qs = parse_qs(query)
@@ -126,7 +154,13 @@ class MockHttp(BaseMockHttpObject):
         meth_name = self._get_method_name(type=self.type,
                                           use_param=self.use_param,
                                           qs=qs, path=path)
+
         meth = getattr(self, meth_name)
+
+        if self.test and isinstance(self.test, LibcloudTestCase):
+            self.test._add_visited_url(url=url)
+            self.test._add_executed_mock_method(method_name=meth_name)
+
         status, body, headers, reason = meth(method, url, body, headers)
         self.response = self.responseCls(status, body, headers, reason)
 
@@ -154,6 +188,18 @@ class MockHttp(BaseMockHttpObject):
         return (httplib.FORBIDDEN, 'Oh Noes!', {'X-Foo': 'fail'},
                 httplib.responses[httplib.FORBIDDEN])
 
+class MockHttpTestCase(MockHttp, unittest.TestCase):
+    # Same as the MockHttp class, but you can also use assertions in the
+    # classes which inherit from this one.
+    def __init__(self, *args, **kwargs):
+        unittest.TestCase.__init__(self)
+
+        if kwargs.get('host', None) and kwargs.get('port', None):
+            MockHttp.__init__(self, *args, **kwargs)
+
+    def runTest(self):
+        pass
+
 class StorageMockHttp(MockHttp):
     def putrequest(self, method, action):
         pass
@@ -166,7 +212,6 @@ class StorageMockHttp(MockHttp):
 
     def send(self, data):
         pass
-
 
 class MockRawResponse(BaseMockHttpObject):
     """

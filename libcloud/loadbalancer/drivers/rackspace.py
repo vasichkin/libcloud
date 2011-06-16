@@ -18,11 +18,13 @@ import os
 try:
     import json
 except ImportError:
-    import simplejson
+    import simplejson as json
 
+from libcloud.utils import reverse_dict
 from libcloud.common.base import Response
-from libcloud.resource.lb.base import LB, LBNode, LBDriver
-from libcloud.resource.lb.types import Provider, LBState
+from libcloud.loadbalancer.base import LoadBalancer, Member, Driver, Algorithm
+from libcloud.loadbalancer.base import DEFAULT_ALGORITHM
+from libcloud.loadbalancer.types import Provider, State
 from libcloud.common.rackspace import (AUTH_HOST_US,
         RackspaceBaseConnection)
 
@@ -63,32 +65,41 @@ class RackspaceConnection(RackspaceBaseConnection):
                 params=params, data=data, method=method, headers=headers)
 
 
-class RackspaceLBDriver(LBDriver):
+class RackspaceLBDriver(Driver):
     connectionCls = RackspaceConnection
-    type = Provider.RACKSPACE
     api_name = 'rackspace_lb'
     name = 'Rackspace LB'
 
-    LB_STATE_MAP = { 'ACTIVE': LBState.RUNNING,
-                     'BUILD': LBState.PENDING }
+    LB_STATE_MAP = { 'ACTIVE': State.RUNNING,
+                     'BUILD': State.PENDING }
+    _VALUE_TO_ALGORITHM_MAP = {
+        'RANDOM': Algorithm.RANDOM,
+        'ROUND_ROBIN': Algorithm.ROUND_ROBIN,
+        'LEAST_CONNECTIONS': Algorithm.LEAST_CONNECTIONS
+    }
+    _ALGORITHM_TO_VALUE_MAP = reverse_dict(_VALUE_TO_ALGORITHM_MAP)
+
+    def list_protocols(self):
+        return self._to_protocols(
+                   self.connection.request('/loadbalancers/protocols').object)
 
     def list_balancers(self):
         return self._to_balancers(
                 self.connection.request('/loadbalancers').object)
 
-    def create_balancer(self, **kwargs):
-        name = kwargs['name']
-        port = kwargs['port']
-        nodes = kwargs['nodes']
+    def create_balancer(self, name, members, protocol='http',
+                        port=80, algorithm=DEFAULT_ALGORITHM):
+        algorithm = self._algorithm_to_value(algorithm)
 
         balancer_object = {"loadBalancer":
                 {"name": name,
                     "port": port,
-                    "protocol": "HTTP",
+                    "algorithm": algorithm,
+                    "protocol": protocol.upper(),
                     "virtualIps": [{"type": "PUBLIC"}],
-                    "nodes": [{"address": node.ip,
-                        "port": node.port,
-                        "condition": "ENABLED"} for node in nodes],
+                    "nodes": [{"address": member.ip,
+                        "port": member.port,
+                        "condition": "ENABLED"} for member in members],
                     }
                 }
 
@@ -103,22 +114,17 @@ class RackspaceLBDriver(LBDriver):
 
         return resp.status == 202
 
-    def balancer_detail(self, **kwargs):
-        try:
-            balancer_id = kwargs['balancer_id']
-        except KeyError:
-            balancer_id = kwargs['balancer'].id
-
+    def get_balancer(self, balancer_id):
         uri = '/loadbalancers/%s' % (balancer_id)
         resp = self.connection.request(uri)
 
         return self._to_balancer(resp.object["loadBalancer"])
 
-    def balancer_attach_node(self, balancer, **kwargs):
-        ip = kwargs['ip']
-        port = kwargs['port']
+    def balancer_attach_member(self, balancer, member):
+        ip = member.ip
+        port = member.port
 
-        node_object = {"nodes":
+        member_object = {"nodes":
                 [{"port": port,
                     "address": ip,
                     "condition": "ENABLED"}]
@@ -126,38 +132,47 @@ class RackspaceLBDriver(LBDriver):
 
         uri = '/loadbalancers/%s/nodes' % (balancer.id)
         resp = self.connection.request(uri, method='POST',
-                data=json.dumps(node_object))
-        return self._to_nodes(resp.object)[0]
+                data=json.dumps(member_object))
+        return self._to_members(resp.object)[0]
 
-    def balancer_detach_node(self, balancer, node):
-        uri = '/loadbalancers/%s/nodes/%s' % (balancer.id, node.id)
+    def balancer_detach_member(self, balancer, member):
+        # Loadbalancer always needs to have at least 1 member.
+        # Last member cannot be detached. You can only disable it or destroy the
+        # balancer.
+        uri = '/loadbalancers/%s/nodes/%s' % (balancer.id, member.id)
         resp = self.connection.request(uri, method='DELETE')
 
         return resp.status == 202
 
-    def balancer_list_nodes(self, balancer):
+    def balancer_list_members(self, balancer):
         uri = '/loadbalancers/%s/nodes' % (balancer.id)
-        return self._to_nodes(
+        return self._to_members(
                 self.connection.request(uri).object)
+
+    def _to_protocols(self, object):
+        protocols = []
+        for item in object["protocols"]:
+            protocols.append(item['name'].lower())
+        return protocols
 
     def _to_balancers(self, object):
         return [ self._to_balancer(el) for el in object["loadBalancers"] ]
 
     def _to_balancer(self, el):
-        lb = LB(id=el["id"],
+        lb = LoadBalancer(id=el["id"],
                 name=el["name"],
                 state=self.LB_STATE_MAP.get(
-                    el["status"], LBState.UNKNOWN),
+                    el["status"], State.UNKNOWN),
                 ip=el["virtualIps"][0]["address"],
                 port=el["port"],
                 driver=self.connection.driver)
         return lb
 
-    def _to_nodes(self, object):
-        return [ self._to_node(el) for el in object["nodes"] ]
+    def _to_members(self, object):
+        return [ self._to_member(el) for el in object["nodes"] ]
 
-    def _to_node(self, el):
-        lbnode = LBNode(id=el["id"],
+    def _to_member(self, el):
+        lbmember = Member(id=el["id"],
                 ip=el["address"],
                 port=el["port"])
-        return lbnode
+        return lbmember

@@ -46,11 +46,10 @@ class MossoBasedConnection(RackspaceBaseConnection):
     Base class for Connection to server management API derived from Mosso:
     OpenStack and RackSpace original one (Mosso itself)
     """
+    _url_key = "server_url"
 
-    def __init__(self, user_id, key, secure, host=None, port=None):
-        super(MossoBasedConnection, self).__init__(user_id, key, secure,
-                                                   host, port)
-
+    def __init__(self, user_id, key, auth_host, secure=True, auth_port=None, auth_path=None):
+        super(MossoBasedConnection, self).__init__(user_id, key, secure, auth_host, auth_port, auth_path)
 
     def request(self, action, params=None, data='', headers=None,
                 method='GET', raw=False):
@@ -108,6 +107,11 @@ class MossoBasedNodeDriver(NodeDriver):
 
     def destroy_node(self, node):
         uri = '/servers/%s' % node.id
+        resp = self.connection.request(uri, method='DELETE')
+        return resp.status in (202, 204)
+
+    def ex_destroy_image(self, image):
+        uri = '/images/%s' % image.id
         resp = self.connection.request(uri, method='DELETE')
         return resp.status in (202, 204)
 
@@ -187,13 +191,12 @@ class RackspaceConnection(MossoBasedConnection):
 
     responseCls = RackspaceResponse
     auth_host = AUTH_HOST_US
-    _url_key = "server_url"
 
     def __init__(self, user_id, key, secure=True):
-        super(RackspaceConnection, self).__init__(user_id, key, secure)
+        super(RackspaceConnection, self).__init__(user_id, key, RackspaceConnection.auth_host, secure)
         self.api_version = 'v1.0'
 
-    def _set_additional_headers(self, action, params, data, headers, method):
+    def _set_additional_headers(self, action, method, params, headers, data):
         """ Set driver specific headers for request
         note that headers should be a dict, which is modified """
 
@@ -625,3 +628,4 @@ class RackspaceUKNodeDriver(RackspaceNodeDriver):
 
     def list_locations(self):
         return [NodeLocation(0, 'Rackspace UK London', 'UK', self)]
+

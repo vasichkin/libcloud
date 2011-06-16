@@ -12,22 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from libcloud.utils import get_driver as get_provider_driver
-from libcloud.resource.lb.types import Provider
-
-__all__ = [
-        "Provider",
-        "DRIVERS",
-        "get_driver",
-        ]
-
-DRIVERS = {
-        Provider.RACKSPACE:
-            ('libcloud.resource.lb.drivers.rackspace', 'RackspaceLBDriver'),
-        Provider.GOGRID:
-            ('libcloud.resource.lb.drivers.gogrid', 'GoGridLBDriver'),
-}
-
-def get_driver(provider):
-    return get_provider_driver(DRIVERS, provider)

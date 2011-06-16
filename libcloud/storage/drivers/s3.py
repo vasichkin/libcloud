@@ -26,7 +26,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from libcloud.utils import fixxpath, findtext, in_development_warning
 from libcloud.utils import read_in_chunks
 from libcloud.common.types import InvalidCredsError, LibcloudError
-from libcloud.common.base import ConnectionUserAndKey
+from libcloud.common.base import ConnectionUserAndKey, RawResponse
 from libcloud.common.aws import AWSBaseResponse
 
 from libcloud.storage.base import Object, Container, StorageDriver
@@ -70,6 +70,9 @@ class S3Response(AWSBaseResponse):
         raise LibcloudError('Unknown error. Status code: %d' % (self.status),
                             driver=S3StorageDriver)
 
+class S3RawResponse(S3Response, RawResponse):
+    pass
+
 class S3Connection(ConnectionUserAndKey):
     """
     Repersents a single connection to the EC2 Endpoint
@@ -77,6 +80,7 @@ class S3Connection(ConnectionUserAndKey):
 
     host = 's3.amazonaws.com'
     responseCls = S3Response
+    rawResponseCls = S3RawResponse
 
     def add_default_params(self, params):
         expires = str(int(time.time()) + EXPIRATION_SECONDS)
@@ -114,7 +118,7 @@ class S3Connection(ConnectionUserAndKey):
             if key.lower() in special_header_keys:
                 special_header_values[key.lower()] = value.lower().strip()
             elif key.lower().startswith('x-amz-'):
-                amz_header_values[key.lower()] = value.lower().strip()
+                amz_header_values[key.lower()] = value.strip()
 
         if not special_header_values.has_key('content-md5'):
             special_header_values['content-md5'] = ''
@@ -290,7 +294,7 @@ class S3StorageDriver(StorageDriver):
                                 success_status_code=httplib.OK)
 
     def upload_object(self, file_path, container, object_name, extra=None,
-                      file_hash=None, ex_storage_class=None):
+                      verify_hash=True, ex_storage_class=None):
         upload_func = self._upload_file
         upload_func_kwargs = { 'file_path': file_path }
 
@@ -298,7 +302,7 @@ class S3StorageDriver(StorageDriver):
                                 upload_func=upload_func,
                                 upload_func_kwargs=upload_func_kwargs,
                                 extra=extra, file_path=file_path,
-                                file_hash=file_hash,
+                                verify_hash=verify_hash,
                                 storage_class=ex_storage_class)
 
     def upload_object_via_stream(self, iterator, container, object_name,
@@ -328,7 +332,7 @@ class S3StorageDriver(StorageDriver):
 
     def _put_object(self, container, object_name, upload_func,
                     upload_func_kwargs, extra=None, file_path=None,
-                    iterator=None, file_hash=None, storage_class=None):
+                    iterator=None, verify_hash=True, storage_class=None):
         headers = {}
         extra = extra or {}
         storage_class = storage_class or 'standard'
@@ -341,9 +345,6 @@ class S3StorageDriver(StorageDriver):
         object_name_cleaned = self._clean_object_name(object_name)
         content_type = extra.get('content_type', None)
         meta_data = extra.get('meta_data', None)
-
-        if not iterator and file_hash:
-            headers['Content-MD5'] = base64.b64encode(file_hash.decode('hex'))
 
         if meta_data:
             for key, value in meta_data.iteritems():
@@ -368,19 +369,22 @@ class S3StorageDriver(StorageDriver):
         bytes_transferred = result_dict['bytes_transferred']
         headers = response.headers
         response = response.response
+        server_hash = headers['etag'].replace('"', '')
 
-        if (file_hash and response.status == httplib.BAD_REQUEST) or \
-           (file_hash and file_hash != headers['etag'].replace('"', '')):
+        if (verify_hash and result_dict['data_hash'] != server_hash):
             raise ObjectHashMismatchError(
                 value='MD5 hash checksum does not match',
                 object_name=object_name, driver=self)
         elif response.status == httplib.OK:
             obj = Object(
-                name=object_name, size=bytes_transferred, hash=file_hash,
+                name=object_name, size=bytes_transferred, hash=server_hash,
                 extra=None, meta_data=meta_data, container=container,
                 driver=self)
 
             return obj
+        else:
+            raise LibcloudError('Unexpected status code, status_code=%s' % (response.status),
+                                driver=self)
 
     def _to_containers(self, obj, xpath):
         return [ self._to_container(element) for element in \

@@ -35,6 +35,8 @@ from libcloud.storage.drivers.dummy import DummyIterator
 from test import StorageMockHttp, MockRawResponse # pylint: disable-msg=E0611
 from test.file_fixtures import StorageFileFixtures # pylint: disable-msg=E0611
 
+current_hash = None
+
 class CloudFilesTests(unittest.TestCase):
 
     def setUp(self):
@@ -49,9 +51,6 @@ class CloudFilesTests(unittest.TestCase):
 
     def tearDown(self):
         self._remove_test_file()
-
-    def test_get_meta_data(self):
-        self.driver.get_meta_data()
 
     def test_invalid_json_throws_exception(self):
         CloudFilesMockHttp.type = 'MALFORMED_JSON'
@@ -110,8 +109,8 @@ class CloudFilesTests(unittest.TestCase):
                                      object_name='test_object')
         self.assertEqual(obj.container.name, 'test_container')
         self.assertEqual(obj.size, 555)
+        self.assertEqual(obj.hash, '6b21c4a111ac178feacf9ec9d0c71f17')
         self.assertEqual(obj.extra['content_type'], 'application/zip')
-        self.assertEqual(obj.extra['etag'], '6b21c4a111ac178feacf9ec9d0c71f17')
         self.assertEqual(
             obj.extra['last_modified'], 'Tue, 25 Jan 2011 22:01:49 GMT')
         self.assertEqual(obj.meta_data['foo-bar'], 'test 1')
@@ -279,7 +278,7 @@ class CloudFilesTests(unittest.TestCase):
         try:
             self.driver.upload_object(file_path=file_path, container=container,
                                       object_name=object_name,
-                                      file_hash='footest123')
+                                      verify_hash=True)
         except ObjectHashMismatchError:
             pass
         else:
@@ -397,6 +396,12 @@ class CloudFilesTests(unittest.TestCase):
         else:
             self.fail('Object does not exist but an exception was not thrown')
 
+    def test_ex_get_meta_data(self):
+        meta_data = self.driver.ex_get_meta_data()
+        self.assertTrue(isinstance(meta_data, dict))
+        self.assertTrue('object_count' in meta_data)
+        self.assertTrue('container_count' in meta_data)
+        self.assertTrue('bytes_used' in meta_data)
 
     def _remove_test_file(self):
         file_path = os.path.abspath(__file__) + '.temp'
@@ -598,16 +603,19 @@ class CloudFilesMockRawResponse(MockRawResponse):
         # test_object_upload_success
 
         body = ''
-        headers = copy.deepcopy(self.base_headers)
-        headers.update(headers)
+        headers = {}
+        headers.update(self.base_headers)
+        headers['etag'] = 'hash343hhash89h932439jsaa89'
         return (httplib.CREATED, body, headers, httplib.responses[httplib.OK])
 
     def  _v1_MossoCloudFS_foo_bar_container_foo_test_upload_INVALID_HASH(
         self, method, url, body, headers):
         # test_object_upload_invalid_hash
         body = ''
-        headers = self.base_headers
-        return (httplib.UNPROCESSABLE_ENTITY, body, headers,
+        headers = {}
+        headers.update(self.base_headers)
+        headers['etag'] = 'foobar'
+        return (httplib.CREATED, body, headers,
                 httplib.responses[httplib.OK])
 
     def _v1_MossoCloudFS_foo_bar_container_foo_bar_object(
@@ -641,10 +649,13 @@ class CloudFilesMockRawResponse(MockRawResponse):
         self, method, url, body, headers):
 
         # test_upload_object_via_stream_success
+        headers = {}
+        headers.update(self.base_headers)
+        headers['etag'] = '577ef1154f3240ad5b9b413aa7346a1e'
         body = 'test'
-        return (httplib.OK,
+        return (httplib.CREATED,
                 body,
-                self.base_headers,
+                headers,
                 httplib.responses[httplib.OK])
 
 if __name__ == '__main__':

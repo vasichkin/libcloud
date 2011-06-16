@@ -15,7 +15,7 @@
 
 __all__ = [
         "Provider",
-        "LBState",
+        "State",
         "LibcloudLBError",
         "LibcloudLBImmutableError",
         ]
@@ -27,10 +27,10 @@ class LibcloudLBError(LibcloudError): pass
 class LibcloudLBImmutableError(LibcloudLBError): pass
 
 class Provider(object):
-    RACKSPACE = 0
+    RACKSPACE_US = 0
     GOGRID = 1
 
-class LBState(object):
+class State(object):
     """
     Standart states for a loadbalancer
 

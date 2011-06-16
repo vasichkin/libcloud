@@ -69,6 +69,9 @@ class Object(object):
     def get_cdn_url(self):
         return self.driver.get_object_cdn_url(obj=self)
 
+    def enable_cdn(self):
+        return self.driver.enable_object_cdn(obj=self)
+
     def download(self, destination_path, overwrite_existing=False,
                  delete_on_failure=True):
         return self.driver.download_object(self, destination_path,
@@ -112,13 +115,16 @@ class Container(object):
     def get_cdn_url(self):
         return self.driver.get_container_cdn_url(container=self)
 
+    def enable_cdn(self):
+        return self.driver.enable_container_cdn(container=self)
+
     def get_object(self, object_name):
         return self.driver.get_object(container_name=self.name,
                                       object_name=object_name)
 
-    def upload_object(self, file_path, object_name, extra=None, file_hash=None):
+    def upload_object(self, file_path, object_name, extra=None, verify_hash=True):
         return self.driver.upload_object(
-            file_path, self, object_name, extra, file_hash)
+            file_path, self, object_name, extra, verify_hash)
 
     def upload_object_via_stream(self, iterator, object_name, extra=None):
         return self.driver.upload_object_via_stream(
@@ -171,16 +177,6 @@ class StorageDriver(object):
 
         self.connection.driver = self
         self.connection.connect()
-
-    def get_meta_data(self):
-        """
-        Return account meta data - total number of containers, objects and
-        number of bytes currently used.
-
-        @return A C{dict} with account meta data.
-        """
-        raise NotImplementedError(
-            'get_account_meta_data not implemented for this driver')
 
     def list_containters(self):
         raise NotImplementedError(
@@ -249,7 +245,15 @@ class StorageDriver(object):
         raise NotImplementedError(
             'get_object_cdn_url not implemented for this driver')
 
-    def download_object(self, obj, destination_path, delete_on_failure=True):
+    def enable_container_cdn(self, container):
+        raise NotImplementedError(
+            'enable_container_cdn not implemented for this driver')
+
+    def enable_object_cdn(self, obj):
+        raise NotImplementedError(
+            'enable_object_cdn not implemented for this driver')
+
+    def download_object(self, obj, destination_path, overwrite_existing=False, delete_on_failure=True):
         """
         Download an object to the specified destination path.
 
@@ -261,7 +265,7 @@ class StorageDriver(object):
                                 incoming file will be saved.
 
         @type overwrite_existing: C{bool}
-        @type overwrite_existing: True to overwrite an existing file.
+        @type overwrite_existing: True to overwrite an existing file, defaults to False.
 
         @type delete_on_failure: C{bool}
         @param delete_on_failure: True to delete a partially downloaded file if
@@ -287,7 +291,7 @@ class StorageDriver(object):
             'download_object_as_stream not implemented for this driver')
 
     def upload_object(self, file_path, container, object_name, extra=None,
-                      file_hash=None):
+                      verify_hash=True):
         """
         Upload an object.
 
@@ -303,10 +307,8 @@ class StorageDriver(object):
         @type extra: C{dict}
         @param extra: (optional) Extra attributes (driver specific).
 
-        @type file_hash: C{str}
-        @param file_hash: (optional) File hash. If provided object hash is
-                          on upload and if it doesn't match the one provided an
-                          exception is thrown.
+        @type verify_hash: C{boolean}
+        @param verify_hash: True to do a file integrity check.
         """
         raise NotImplementedError(
             'upload_object not implemented for this driver')
@@ -424,7 +426,7 @@ class StorageDriver(object):
                                    exists.
 
         @type chunk_size: C{int}
-        @param chunk_size: Optional chunk size (defaults to CHUNK_SIZE)
+        @param chunk_size: Optional chunk size (defaults to L{libcloud.storage.base.CHUNK_SIZE}, 8kb)
 
         @return C{bool} True on success, False otherwise.
         """

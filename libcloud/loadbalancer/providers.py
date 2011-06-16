@@ -13,17 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pprint import pprint
+from libcloud.utils import get_driver as get_provider_driver
+from libcloud.loadbalancer.types import Provider
 
-from libcloud.storage.types import Provider
-from libcloud.storage.providers import get_driver
+__all__ = [
+        "Provider",
+        "DRIVERS",
+        "get_driver",
+        ]
 
-CloudFiles = get_driver(Provider.CLOUDFILES_UK)
+DRIVERS = {
+        Provider.RACKSPACE_US:
+            ('libcloud.loadbalancer.drivers.rackspace', 'RackspaceLBDriver'),
+        Provider.GOGRID:
+            ('libcloud.loadbalancer.drivers.gogrid', 'GoGridLBDriver'),
+}
 
-driver = CloudFiles('access key id', 'secret key')
-
-containers = driver.list_containers()
-container_objects = driver.list_container_objects(containers[0])
-
-pprint(containers)
-pprint(container_objects)
+def get_driver(provider):
+    return get_provider_driver(DRIVERS, provider)

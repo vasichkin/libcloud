@@ -25,39 +25,6 @@ import libcloud
 from libcloud.httplib_ssl import LibcloudHTTPSConnection
 from httplib import HTTPConnection as LibcloudHTTPConnection
 
-class RawResponse(object):
-
-    def __init__(self, response=None):
-        self._status = None
-        self._response = None
-        self._headers = {}
-        self._error = None
-        self._reason = None
-
-    @property
-    def response(self):
-        if not self._response:
-            self._response = self.connection.connection.getresponse()
-        return self._response
-
-    @property
-    def status(self):
-        if not self._status:
-            self._status = self.response.status
-        return self._status
-
-    @property
-    def headers(self):
-        if not self._headers:
-            self._headers = dict(self.response.getheaders())
-        return self._headers
-
-    @property
-    def reason(self):
-        if not self._reason:
-            self._reason = self.response.reason
-        return self._reason
-
 class Response(object):
     """
     A Base Response class to derive from.
@@ -112,6 +79,43 @@ class Response(object):
         @return: C{True} or C{False}
         """
         return self.status == httplib.OK or self.status == httplib.CREATED
+
+class RawResponse(Response):
+
+    def __init__(self, response=None):
+        self._status = None
+        self._response = None
+        self._headers = {}
+        self._error = None
+        self._reason = None
+
+    @property
+    def response(self):
+        if not self._response:
+            response = self.connection.connection.getresponse()
+            self._response, self.body = response, response
+            if not self.success():
+                self.parse_error()
+        return self._response
+
+    @property
+    def status(self):
+        if not self._status:
+            self._status = self.response.status
+        return self._status
+
+    @property
+    def headers(self):
+        if not self._headers:
+            self._headers = dict(self.response.getheaders())
+        return self._headers
+
+    @property
+    def reason(self):
+        if not self._reason:
+            self._reason = self.response.reason
+        return self._reason
+
 
 #TODO: Move this to a better location/package
 class LoggingConnection():
@@ -262,9 +266,14 @@ class ConnectionKey(object):
         @returns: A connection
         """
         host = host or self.host
-        port = port or self.port[self.secure]
 
-        kwargs = {'host': host, 'port': port}
+        # port might be included in service url, so pick it if it's present
+        if ":" in host:
+            host, port = host.split(":")
+        else:
+            port = port or self.port[self.secure]
+
+        kwargs = {'host': host, 'port': int(port)}
 
         connection = self.conn_classes[self.secure](**kwargs)
         # You can uncoment this line, if you setup a reverse proxy server
@@ -299,7 +308,8 @@ class ConnectionKey(object):
                 data='',
                 headers=None,
                 method='GET',
-                raw=False):
+                raw=False,
+                host=None):
         """
         Request a given `action`.
 
@@ -323,6 +333,15 @@ class ConnectionKey(object):
         @type method: C{str}
         @param method: An HTTP method such as "GET" or "POST".
 
+        @type raw: C{bool}
+        @param raw: True to perform a "raw" request aka only send the headers
+                     and use the rawResponseCls class. This is used with
+                     storage API when uploading a file.
+
+        @type host: C{str}
+        @param host: To which host to send the request. If not specified,
+                     self.host is used.
+
         @return: An instance of type I{responseCls}
         """
         if params is None:
@@ -336,9 +355,10 @@ class ConnectionKey(object):
         params = self.add_default_params(params)
         # Extend default headers
         headers = self.add_default_headers(headers)
-        # We always send a content length and user-agent header
+        # We always send a user-agent header
         headers.update({'User-Agent': self._user_agent()})
-        headers.update({'Host': self.host})
+        host = host or self.host
+        headers.update({'Host': host})
         # Encode data if necessary
         if data != '' and data != None:
             data = self.encode_data(data)
@@ -355,12 +375,12 @@ class ConnectionKey(object):
 
         # Removed terrible hack...this a less-bad hack that doesn't execute a
         # request twice, but it's still a hack.
-        self.connect()
+        self.connect(host=host)
         try:
             # @TODO: Should we just pass File object as body to request method
             # instead of dealing with splitting and sending the file ourselves?
             if raw:
-                self.connection.putrequest(method, action)
+                self.connection.putrequest(method, url)
 
                 for key, value in headers.iteritems():
                     self.connection.putheader(key, value)

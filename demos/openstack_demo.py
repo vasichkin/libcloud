@@ -24,6 +24,7 @@
 
 from pprint import pprint
 import traceback
+import re
 
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
@@ -54,8 +55,25 @@ def main():
         print 'Hint define N0VA_API_KEY NOVA_USERNAME NOVA_URL'
         return 1
 
+    if 'NOVA_VERSION' in os.environ:
+        version = os.environ['NOVA_VERSION']
+    else:
+        version = None
+
+
+
     try:
-        open_stack = OpenStackDriver(user_name=nova_user_name, api_key= nova_api_key , url=nova_url)
+        if version=='v1.0':
+            open_stack = OpenStackDriver(version='v1.0', username=nova_user_name,
+                                         api_key=nova_api_key, auth_host=nova_url)
+        else:
+            match = re.match('(http(?:s)?://[^:/]*(?::\d+)?/.*/)v1.[01](?:/)?', nova_url)
+            if match:
+                version_url = match.group(1)
+            else:
+                version_url = nova_url
+            open_stack = OpenStackDriver(version=version, username=nova_user_name,
+                                         api_key=nova_api_key, version_url=version_url)
         print ">> Loading nodes..."
         nodes = open_stack.list_nodes()
         pprint(nodes)
@@ -71,14 +89,21 @@ def main():
     sizes = open_stack.list_sizes()
     pprint(sizes[:10])
 
-    instance = open_stack.create_node(name='create_image_demo',
+    print ">> Show limits..."
+    limits = open_stack.ex_limits()
+    pprint(limits)
+
+    print ">> Create a server..."
+
+    instance = open_stack.create_node(name='test_server',
                            image=images[0],
                            size=sizes[0])
     #TODO: add check status of instance
+
+    print ">> Delete the server..."
     instance.destroy()
     return 0
 
 if __name__ == '__main__':
     main()
 
-  

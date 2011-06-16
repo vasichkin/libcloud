@@ -138,28 +138,6 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
                                          driver=self.driver)
 
 
-class OpenStackConnection(MossoBasedConnection):
-    """ Connection class for the OpenStack driver """
-    
-    responseCls = OpenStackResponse
-
-    def __init__(self, user_name, api_key, url, secure):
-        self.server_url = url
-        r = urlparse.urlparse(url)
-
-        # here we rely on path structure like
-        # http://hostname:port/v1.0 so path=path_version
-        self.api_version = r.path
-        self.auth_token = None
-        super(OpenStackConnection, self).__init__(user_id=user_name,
-                                                  key=api_key,
-                                                  secure=secure,
-                                                  host=r.hostname,
-                                                  port=r.port)
-
-    def encode_data(self, data):
-        return data
-
     def _set_additional_headers(self, action, method, params, headers, data):
         if method in ("POST", "PUT"):
             headers['Content-Type'] = 'application/json'

@@ -151,6 +151,25 @@ class MossoBasedNodeDriver(NodeDriver):
     def _to_sizes(self, response_object):
         raise NotImplementedError('implement _to_sizes in successor')
 
+    def ex_save_image(self, node, name):
+        """Create an image for node.
+
+        @keyword    node: node to use as a base for image
+        @param      node: L{Node}
+        @keyword    name: name for new image
+        @param      name: C{string}
+        """
+
+        body = self._save_image_request_body(node, name)
+        return self._to_image(self.connection.request("/images",
+                                                      method="POST",
+                                                      data=body).object)
+
+    def _save_image_request_body(self, node, image_name):
+        """ Form driver specific request body for save image from node """
+        raise NotImplementedError('Generate body for save image request')
+
+
 
 class RackspaceResponse(MossoBasedResponse):
 
@@ -568,25 +587,14 @@ class RackspaceNodeDriver(MossoBasedNodeDriver):
 
         return {"rate": rate, "absolute": absolute}
 
-    def ex_save_image(self, node, name):
-        """Create an image for node.
-
-        @keyword    node: node to use as a base for image
-        @param      node: L{Node}
-        @keyword    name: name for new image
-        @param      name: C{string}
-        """
-
+    def _save_image_request_body(self, node, image_name):
         image_elm = ET.Element(
                 'image',
                 {'xmlns': NAMESPACE,
-                    'name': name,
+                    'name': image_name,
                     'serverId': node.id}
         )
-
-        return self._to_image(self.connection.request("/images",
-                    method="POST",
-                    data=ET.tostring(image_elm)).object)
+        return ET.tostring(image_elm)
 
     def _to_shared_ip_group(self, el):
         servers_el = self._findall(el, 'servers')

@@ -257,7 +257,8 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
                           name=el.get('name'),
                           driver=self.connection.driver,
                           extra={'updated': el.get('updated'),
-                                 'links': el.get('links')}
+                                 'links': el.get('links'),
+                                 'status': el.get('status')}
         )
         return image
 

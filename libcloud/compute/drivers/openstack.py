@@ -16,12 +16,13 @@
 """ OpenStack driver """
 
 import urlparse
+import httplib
 try:
     import simplejson as json
 except ImportError:
     import json
 
-from libcloud.common.types import MalformedResponseError
+from libcloud.common.types import MalformedResponseError, InvalidCredsError
 from libcloud.compute.types import NodeState, Provider
 from libcloud.compute.base import Node, NodeLocation
 from libcloud.compute.base import NodeSize, NodeImage
@@ -256,7 +257,8 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
                           name=el.get('name'),
                           driver=self.connection.driver,
                           extra={'updated': el.get('updated'),
-                                 'links': el.get('links')}
+                                 'links': el.get('links'),
+                                 'status': el.get('status')}
         )
         return image
 
@@ -351,6 +353,11 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
     def ex_limits(self):
         resp = self.connection.request('/limits', method='GET')
         return resp.object['limits']
+
+    def _save_image_request_body(self, node, image_name):
+        body = {"image": {"serverId": node.id, "name": image_name}}
+        return json.dumps(body)
+
 
 
 class OpenStackIps(object):

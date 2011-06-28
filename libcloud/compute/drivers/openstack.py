@@ -363,11 +363,11 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
 class OpenStackIps(object):
     """ Contains the list of public and private IPs """
 
-    public_ipv4 = []
-    private_ipv4 = []
-    public_ipv6 = []
-    private_ipv6 = []
     def __init__(self, ip_list):
+        self.public_ipv4 = []
+        self.private_ipv4 = []
+        self.public_ipv6 = []
+        self.private_ipv6 = []
         self._separate_by_protocol(ip_list['public'],
                                    self.public_ipv4, self.public_ipv6)
         self._separate_by_protocol(ip_list['private'],

@@ -24,6 +24,7 @@ import libcloud
 
 from libcloud.httplib_ssl import LibcloudHTTPSConnection
 from httplib import HTTPConnection as LibcloudHTTPConnection
+from types import FailureResponseError
 
 class Response(object):
     """
@@ -45,7 +46,8 @@ class Response(object):
         self.error = response.reason
 
         if not self.success():
-            raise Exception(self.parse_error())
+            err_code, status, body = self.parse_error()
+            raise FailureResponseError(err_code, status, body)
 
         self.object = self.parse_body()
 

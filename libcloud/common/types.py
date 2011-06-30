@@ -17,7 +17,8 @@ __all__ = [
     "LibcloudError",
     "MalformedResponseError",
     "InvalidCredsError",
-    "InvalidCredsException"
+    "InvalidCredsException",
+    "FailureResponseError"
     ]
 
 class LibcloudError(Exception):
@@ -50,6 +51,23 @@ class MalformedResponseError(LibcloudError):
                 + repr(self.value)
                 + ">: "
                 + repr(self.body))
+
+class FailureResponseError(LibcloudError):
+    """
+    Wrap exceptions
+    """
+    def __init__(self, error = None, code = None, body=None):
+        self.body = body
+        self.code = code
+        self.error = error
+
+    def __str__(self):
+        return ('error: '
+            + repr(self.error)
+            + ', code: '
+            + repr(self.code)
+            + ', body: '
+            + repr(self.body))
 
 class InvalidCredsError(LibcloudError):
     """Exception used when invalid credentials are used on a provider."""

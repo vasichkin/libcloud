@@ -54,20 +54,15 @@ class MalformedResponseError(LibcloudError):
 
 class FailureResponseError(LibcloudError):
     """
-    Wrap exceptions
+    Exceptions for the cases when a provider cann't perform operations and throws an exception
     """
-    def __init__(self, error = None, code = None, body=None):
+    def __init__(self, error=None, code=None, body=None):
         self.body = body
         self.code = code
         self.error = error
 
     def __str__(self):
-        return ('error: '
-            + repr(self.error)
-            + ', code: '
-            + repr(self.code)
-            + ', body: '
-            + repr(self.body))
+        return 'error: %s, code: %s, , body: %s' % (self.error, self.code, self.body)
 
 class InvalidCredsError(LibcloudError):
     """Exception used when invalid credentials are used on a provider."""

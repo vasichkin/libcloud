@@ -49,16 +49,20 @@ class OpenStackJsonResponse(MossoBasedResponse):
 
     def parse_error(self):
         """Used in to form message for exception to raise in case self.status is not OK"""
-
+        first_level_key = ''
         try:
             body = json.loads(self.body)
-            if 'cloudServersFault' in body and 'message' in body['cloudServersFault']:
-                msg = body['cloudServersFault']['message']
+            if len(body) > 0:
+                for key in body:
+                    if 'message' in body[key]:
+                        first_level_key = key
+                        msg = body[key]['message']
+                        break
             else:
                 msg = self.body
         except:
             msg = self.body
-        return self.error, self.status, msg
+        return self.error, self.status, first_level_key, msg
 
 
 def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,

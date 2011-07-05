@@ -46,8 +46,8 @@ class Response(object):
         self.error = response.reason
 
         if not self.success():
-            err_code, status, body = self.parse_error()
-            raise FailureResponseError(err_code, status, body)
+            err_code, status, first_level_key, message = self.parse_error()
+            raise FailureResponseError(first_level_key, err_code, status, message)
 
         self.object = self.parse_body()
 

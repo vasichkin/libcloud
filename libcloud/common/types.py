@@ -56,13 +56,14 @@ class FailureResponseError(LibcloudError):
     """
     Exceptions for the cases when a provider cann't perform operations and throws an exception
     """
-    def __init__(self, error=None, code=None, body=None):
-        self.body = body
+    def __init__(self, first_level_key = None, status=None, code=None, message=None):
+        self.first_level_key = first_level_key
+        self.message = message
         self.code = code
-        self.error = error
+        self.status = status
 
     def __str__(self):
-        return 'error: %s, code: %s, , body: %s' % (self.error, self.code, self.body)
+        return 'status: %s, code: %s, message: %s' % (self.status, self.code, self.message)
 
 class InvalidCredsError(LibcloudError):
     """Exception used when invalid credentials are used on a provider."""

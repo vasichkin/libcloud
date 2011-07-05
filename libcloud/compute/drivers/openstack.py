@@ -253,6 +253,9 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
                  for image in images if image.get('status') == 'ACTIVE' ]
 
     def _to_image(self, el):
+        if 'image' in el:
+            el = el.get('image')
+
         image = NodeImage(id=el.get('id'),
                           name=el.get('name'),
                           driver=self.connection.driver,

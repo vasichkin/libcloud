@@ -423,6 +423,10 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
         resp = self.connection.request('/os-floating-ips/%s/disassociate' % floating_ip_id, method='POST')
         return  resp.status == 200
 
+    def ex_reboot(self, node, reboot_type):
+        body = {"reboot" : {"type": reboot_type}}
+        resp = self._node_action(node, body=body)
+        return resp.status == 202
 
 
 

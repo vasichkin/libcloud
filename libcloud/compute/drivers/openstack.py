@@ -81,7 +81,10 @@ def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,
     if version == 'v1.0':
         return OpenStackNodeDriver_v1_0(username, api_key, secure, host=auth_host, port=auth_port)
     else:
+        if isinstance(version, dict):
+            return OpenStackNodeDriver_v1_1(username, api_key, url=version_url, version=version['version'], version_code_name=version['version_code_name'])
         return OpenStackNodeDriver_v1_1(username, api_key, url=version_url, version=version)
+
 
 
 class OpenStackConnection_v1_0(RackspaceConnection):
@@ -161,6 +164,18 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
         headers['Accept'] = 'application/json'
         return headers
 
+class FloatingIp():
+    def __init__(self, id, ip, fixed_ip=None, instance_id=None):
+        self.id = id
+        self.ip = ip
+        self.fixed_ip = fixed_ip
+        self.instance_id = instance_id
+
+    def __repr__(self):
+        return 'FloatingIp: id=%s; ip=%s; fixed_ip=%s; instance_id=%s' \
+        % (self.id, self.ip, self.fixed_ip, self.instance_id)
+
+
 class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
     """ OpenStack node driver. """
     connectionCls = OpenStackConnection_v1_1
@@ -208,7 +223,7 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
                        'DELETE_IP': NodeState.PENDING,
                        'UNKNOWN': NodeState.UNKNOWN}
 
-    def __init__(self, user_name, api_key, url, secure=False, version=None):
+    def __init__(self, user_name, api_key, url, secure=False, version=None, version_code_name=None):
         """
         user_name NOVA_USERNAME as reported by OpenStack
         api_key NOVA_API_KEY as reported by OpenStack
@@ -224,6 +239,7 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
                                               version=version)
         self.connection.driver = self
         self.connection.connect()
+        self.version_code_name=version_code_name
 
     def list_locations(self):
         """Lists available locations. So far there is no public locations
@@ -302,8 +318,13 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
         ex_metadata = kwargs.get('ex_metadata')
         ex_personality = kwargs.get('ex_personality')
 
-        flavorRef = node_size.links[0]['href']
         imageRef = node_image.extra['links'][0]['href']
+        flavorRef = node_size.links[0]['href']
+        
+        if self.version_code_name == 'D2':
+            imageRef = str(node_image.id)
+            flavorRef = str(node_size.id)
+
         request = {'server': {'name': name, 'flavorRef': flavorRef,
                               'imageRef': imageRef}}
         if ex_metadata:
@@ -373,6 +394,38 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
     def _save_image_request_body(self, node, image_name):
         body = {"image": {"serverId": node.id, "name": image_name}}
         return json.dumps(body)
+
+    def _to_floating_ip(self, floating_ip):
+        return FloatingIp(floating_ip['id'], floating_ip['ip'], floating_ip['fixed_ip'], floating_ip['instance_id'])
+
+    def ex_allocate_floating_ip(self):
+        resp = self.connection.request('/os-floating-ips', method='POST')
+        return FloatingIp(resp.object['allocated']['id'], resp.object['allocated']['floating_ip'])
+
+    def ex_release_floating_ip(self, floating_ip_id):
+        resp = self.connection.request('/os-floating-ips/%s' %floating_ip_id, method='DELETE')
+        return resp.status == 200
+
+    def ex_get_all_floating_ips(self):
+        resp = self.connection.request('/os-floating-ips')
+        floating_ips = []
+        for floating_ip in resp.object['floating_ips']:
+            floating_ips.append(self._to_floating_ip(floating_ip['floating_ip']))
+        return floating_ips
+
+    def ex_associate_floating_ip(self, floating_ip_id, fixed_ip_id):
+        request = {'associate_address' :{'fixed_ip' : fixed_ip_id}}
+        resp = self.connection.request('/os-floating-ips/%s/associate' % floating_ip_id, method='POST', data=json.dumps(request))
+        return resp.status == 200
+
+    def ex_floating_ip_details(self, floating_ip_id):
+        resp = self.connection.request('/os-floating-ips/%s' % floating_ip_id)
+        return  self._to_floating_ip(resp.object['floating_ip'])
+
+    def ex_disassociate_floating_ip(self, floating_ip_id):
+        resp = self.connection.request('/os-floating-ips/%s/disassociate' % floating_ip_id, method='POST')
+        return  resp.status == 200
+
 
 
 

@@ -165,15 +165,15 @@ class OpenStackConnection_v1_1(MossoBasedConnection):
         return headers
 
 class FloatingIp():
-    def __init__(self, floating_id, floating_ip, fixed_ip=None, instance_id=None):
-        self.floating_id = floating_id
-        self.floating_ip = floating_ip
+    def __init__(self, id, ip, fixed_ip=None, instance_id=None):
+        self.id = id
+        self.ip = ip
         self.fixed_ip = fixed_ip
         self.instance_id = instance_id
 
     def __repr__(self):
         return 'FloatingIp: id=%s; ip=%s; fixed_ip=%s; instance_id=%s' \
-        % (self.floating_id, self.floating_ip, self.fixed_ip, self.instance_id)
+        % (self.id, self.ip, self.fixed_ip, self.instance_id)
 
 
 class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):

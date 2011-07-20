@@ -408,10 +408,7 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
 
     def ex_get_all_floating_ips(self):
         resp = self.connection.request('/os-floating-ips')
-        floating_ips = []
-        for floating_ip in resp.object['floating_ips']:
-            floating_ips.append(self._to_floating_ip(floating_ip['floating_ip']))
-        return floating_ips
+        return map(lambda x: self._to_floating_ip(x['floating_ip']), resp.object['floating_ips'])
 
     def ex_associate_floating_ip(self, floating_ip_id, fixed_ip_id):
         request = {'associate_address' :{'fixed_ip' : fixed_ip_id}}

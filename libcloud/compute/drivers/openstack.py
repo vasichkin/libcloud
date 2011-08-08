@@ -86,7 +86,7 @@ def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,
         if keystone_url:
             class _(KeystoneAuth, OpenStackNodeDriver_v1_1):
                 def __init__(self, *arg, **kwarg):
-                    KeystoneAuth.__init__(self, keystone_url = keystone_url)
+                    KeystoneAuth.__init__(self, keystone_url=keystone_url, api_url=version_url)
                     OpenStackNodeDriver_v1_1.__init__(self, *arg, **kwarg)
             driver_class = _
         else:

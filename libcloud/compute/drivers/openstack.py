@@ -26,6 +26,7 @@ from libcloud.common.types import MalformedResponseError, InvalidCredsError
 from libcloud.compute.types import NodeState, Provider
 from libcloud.compute.base import Node, NodeLocation
 from libcloud.compute.base import NodeSize, NodeImage
+from libcloud.compute.keystone import KeystoneAuth
 from libcloud.compute.drivers.rackspace import MossoBasedNodeDriver, RackspaceNodeDriver
 from libcloud.compute.drivers.rackspace import MossoBasedResponse, RackspaceConnection
 from libcloud.compute.drivers.rackspace import MossoBasedConnection
@@ -66,7 +67,7 @@ class OpenStackJsonResponse(MossoBasedResponse):
 
 
 def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,
-                        auth_port=None, version_url=None):
+                        auth_port=None, version_url=None, keystone_url=None):
     """ A helper function to instantiate driver of desired type, depending on which openstack
     API version is used
 
@@ -74,16 +75,27 @@ def OpenStackNodeDriver(version, username, api_key, secure=None, auth_host=None,
               to use newer JSON-based API. If None Version API is requested and CURRENT is used.
     username - user name
     api_key - API access api key
-    secure - is for v1.0 only, if connection SSL, in 1.1 it is determined with auth info
+    secure - is for v1.0 only, if connection SSL, in 1.keystone_url1 it is determined with auth info
     auth_host and auth_port - hostname and port of auth URL for 1.0 only
     version_url - For 1.1+ only. URL of version list API call
+    keystone - is KeyStone authentication used
     """
     if version == 'v1.0':
         return OpenStackNodeDriver_v1_0(username, api_key, secure, host=auth_host, port=auth_port)
     else:
+        if keystone_url:
+            class _(KeystoneAuth, OpenStackNodeDriver_v1_1):
+                def __init__(self, *arg, **kwarg):
+                    KeystoneAuth.__init__(self, keystone_url = keystone_url)
+                    OpenStackNodeDriver_v1_1.__init__(self, *arg, **kwarg)
+            driver_class = _
+        else:
+            driver_class = OpenStackNodeDriver_v1_1
+
         if isinstance(version, dict):
-            return OpenStackNodeDriver_v1_1(username, api_key, url=version_url, version=version['version'], version_code_name=version['version_code_name'])
-        return OpenStackNodeDriver_v1_1(username, api_key, url=version_url, version=version)
+            return driver_class(username, api_key, url=version_url,
+                                version=version['version'], version_code_name=version['version_code_name'])
+        return driver_class(username, api_key, url=version_url, version=version)
 
 
 
@@ -232,11 +244,11 @@ class OpenStackNodeDriver_v1_1(MossoBasedNodeDriver):
         version - which API version to use
         """
 
-        self.connection = OpenStackConnection_v1_1(user_name=user_name,
-                                              api_key=api_key,
-                                              url=url,
-                                              secure=secure,
-                                              version=version)
+        self.connection = self.connectionCls(user_name=user_name,
+                                             api_key=api_key,
+                                             url=url,
+                                             secure=secure,
+                                             version=version)
         self.connection.driver = self
         self.connection.connect()
         self.version_code_name=version_code_name

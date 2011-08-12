@@ -450,10 +450,13 @@ class OpenStackIps(object):
         self.private_ipv4 = []
         self.public_ipv6 = []
         self.private_ipv6 = []
-        self._separate_by_protocol(ip_list['public'],
-                                   self.public_ipv4, self.public_ipv6)
-        self._separate_by_protocol(ip_list['private'],
+        for ip_list_value in ip_list.keys():
+            if 'private' in ip_list_value:
+                    self._separate_by_protocol(ip_list[ip_list_value],
                                    self.private_ipv4, self.private_ipv6)
+            if 'public' in ip_list_value:
+                    self._separate_by_protocol(ip_list[ip_list_value],
+                                   self.public_ipv4, self.public_ipv6)
 
     def _separate_by_protocol(self, input_list, out_list_v4, out_list_v6):
         """
